@@ -185,21 +185,18 @@ elif menu == "✏️ Edit Data Barang":
       with col_e1:
         nomor_rak_baru = st.text_input("Nomor Rak / Kolom", value=str(data_lama["Nomor Rak"]))
       with col_e2:
-        tingkat_ opsi = ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"]
-        default_tingkat = (
-            tingkat_opsi.index(data_lama["Tingkat Rak"])
-            if data_lama["Tingkat Rak"] in tingkat_opsi
-            else 0
-        )
-        tingkat_baru = st.selectbox("Tingkat / Level Rak", tingkat_opsi, index=default_tingkat)
+        tingkat_opsi = ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"]
+        default_idx = 0
+        if data_lama["Tingkat Rak"] in tingkat_opsi:
+          default_idx = tingkat_opsi.index(data_lama["Tingkat Rak"])
+        tingkat_baru = st.selectbox("Tingkat / Level Rak", tingkat_opsi, index=default_idx)
 
       stok_baru = st.number_input("Stok Sistem", min_value=0, step=1, value=int(data_lama["Stok Sistem"]))
-       harga_baru = st.number_input("Harga Satuan (Rp)", min_value=0.0, step=1000.0, format="%.2f", value=float(data_lama["Harga Satuan"]))
+      harga_baru = st.number_input("Harga Satuan (Rp)", min_value=0.0, step=1000.0, format="%.2f", value=float(data_lama["Harga Satuan"]))
 
       submit_simpan_edit = st.form_submit_button("💾 Simpan Perubahan Data")
 
       if submit_simpan_edit:
-        # Update baris data
         df_barang.loc[df_barang["Kode Barang"] == kode_lama, "Kode Barang"] = kode_baru_input
         df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Nama Barang"] = nama_baru_input
         df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Kategori"] = kategori_baru_input
@@ -210,7 +207,7 @@ elif menu == "✏️ Edit Data Barang":
         df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Harga Satuan"] = harga_baru
 
         df_barang.to_csv(DB_BARANG, index=False)
-        st.success(f"Data barang `{nama_baru_input}` berhasil diperbarui secara keseluruhan!")
+        st.success(f"Data barang `{nama_baru_input}` berhasil diperbarui!")
         st.rerun()
 
 # ==========================================
