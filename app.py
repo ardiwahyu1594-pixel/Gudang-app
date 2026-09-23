@@ -55,26 +55,30 @@ if "Nama Rak" not in df_barang.columns:
 if "Nomor Rak" not in df_barang.columns:
   df_barang["Nomor Rak"] = "-"
 if "Tingkat Rak" not in df_barang.columns:
-  df_barang["Tingkat Rak"] = "Level 1"
+  df_barang["Tingkat Rak"] = "Level 1 (Bawah)"
 if "Kategori" not in df_barang.columns:
-  df_barang["Kategori"] = "Umum"
+  df_barang["Kategori"] = "-"
+if "Harga Satuan" not in df_barang.columns:
+  df_barang["Harga Satuan"] = 0.0
 df_barang.to_csv(DB_BARANG, index=False)
 
 df_transaksi = pd.read_csv(DB_TRANSAKSI)
 
 
-# Fungsi untuk memberikan warna otomatis pada tabel berdasarkan kategori
-def warnai_kategori(row):
-  # Anda bisa menyesuaikan warna latar belakang (background-color) sesuai keinginan
-  kategori = str(row["Kategori"]).lower()
-  if "karton" in kategori or "box" in kategori:
-    return ["background-color: #d1ecf1"] * len(row)  # Biru muda
-  elif "plastic" in kategori or "plastik" in kategori:
-    return ["background-color: #d4edda"] * len(row)  # Hijau muda
-  elif "sheet" in kategori or "kertas" in kategori:
-    return ["background-color: #fff3cd"] * len(row)  # Kuning muda
-  elif "aseptic" in kategori:
-    return ["background-color: #f8d7da"] * len(row)  # Merah muda / pink lembut
+# Fungsi untuk memberikan warna otomatis berdasarkan Nama Barang atau Kategori
+def warnai_material(row):
+  teks_cek = (
+      str(row["Nama Barang"]).lower() + " " + str(row["Kategori"]).lower()
+  )
+
+  if "aseptic" in teks_cek:
+    return ["background-color: #f8d7da"] * len(row)  # Merah / Pink Muda
+  elif "karton" in teks_cek or "box" in teks_cek:
+    return ["background-color: #d1ecf1"] * len(row)  # Biru Muda
+  elif "plastik" in teks_cek or "plastic" in teks_cek:
+    return ["background-color: #d4edda"] * len(row)  # Hijau Muda
+  elif "sheet" in teks_cek or "kertas" in teks_cek:
+    return ["background-color: #fff3cd"] * len(row)  # Kuning Muda
   else:
     return [""] * len(row)
 
@@ -86,7 +90,7 @@ menu = st.sidebar.selectbox(
     [
         "📊 Dashboard Stok",
         "📍 Pemetaan Rak",
-        "✏️ Edit Posisi Rak",
+        "✏️ Edit Data Barang",
         "📥 Barang Masuk",
         "📤 Barang Keluar",
         "📋 Stok Opname",
@@ -99,10 +103,6 @@ menu = st.sidebar.selectbox(
 # ==========================================
 if menu == "📊 Dashboard Stok":
   st.title("📊 Dashboard Stok & Lokasi Gudang")
-  st.markdown(
-      "Tabel di bawah dikelompokkan warnanya otomatis berdasarkan jenis"
-      " kategori material."
-  )
   st.markdown("---")
 
   if df_barang.empty:
@@ -115,25 +115,12 @@ if menu == "📊 Dashboard Stok":
     col1.metric("Total Jenis Barang", f"{total_jenis} Jenis")
     col2.metric("Total Unit dalam Stok", f"{total_item} Unit")
 
-    st.subheader("Daftar Inventaris Berwarna Berdasarkan Kategori")
-
-    # Tampilkan tabel dengan gaya warna
-    df_styled = df_barang.style.apply(warnai_kategori, axis=1)
+    st.subheader("Daftar Inventaris Berwarna Otomatis")
+    df_styled = df_barang.style.apply(warnai_material, axis=1)
     st.dataframe(df_styled, use_container_width=True)
 
-    st.markdown(
-        """
-        **Keterangan Warna Kategori:**
-        - 🟦 **Biru Muda:** Karton / Box
-        - 🟩 **Hijau Muda:** Plastik
-        - 🟨 **Kuning Muda:** Sheet / Kertas
-        - 🟥 **Merah/Pink Muda:** Aseptic Bag
-        - ⬜ **Putih:** Kategori Lainnya
-        """
-    )
-
 # ==========================================
-# 2. PEMETAAN RAK (PENCARIAN LOKASI)
+# 2. PEMETAAN RAK
 # ==========================================
 elif menu == "📍 Pemetaan Rak":
   st.title("📍 Denah & Pemetaan Posisi Rak Barang")
@@ -162,86 +149,68 @@ elif menu == "📍 Pemetaan Rak":
         "Nomor Rak",
         "Tingkat Rak",
         "Stok Sistem",
-    ]].style.apply(warnai_kategori, axis=1)
+    ]].style.apply(warnai_material, axis=1)
     st.dataframe(df_tampil_styled, use_container_width=True)
 
 # ==========================================
-# 3. EDIT POSISI RAK
+# 3. EDIT DATA BARANG (SEMUA KOLOM)
 # ==========================================
-elif menu == "✏️ Edit Posisi Rak":
-  st.title("✏️ Perbarui Nama, Nomor & Tingkat Rak Barang")
-  st.markdown("Gunakan menu ini untuk mengisi atau mengubah lokasi rak barang.")
+elif menu == "✏️ Edit Data Barang":
+  st.title("✏️ Edit Lengkap Data Barang & Lokasi Rak")
+  st.markdown(
+      "Pilih barang yang ingin diubah, lalu perbarui informasi datanya di"
+      " bawah."
+  )
   st.markdown("---")
 
   if df_barang.empty:
-    st.warning("Belum ada data barang!")
+    st.warning("Belum ada data barang untuk diedit!")
   else:
-    with st.form("form_edit_rak"):
-      pilih_brg = st.selectbox(
-          "Pilih Barang yang Ingin Diatur Raknya",
-          df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
-      )
+    pilih_brg = st.selectbox(
+        "Pilih Barang yang Ingin Diedit",
+        df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
+    )
 
-      kode_terpilih = pilih_brg.split(" - ")[0]
-      nama_rak_lama = df_barang.loc[
-          df_barang["Kode Barang"] == kode_terpilih, "Nama Rak"
-      ].values[0]
-      nomor_rak_lama = df_barang.loc[
-          df_barang["Kode Barang"] == kode_terpilih, "Nomor Rak"
-      ].values[0]
-      tingkat_lama = df_barang.loc[
-          df_barang["Kode Barang"] == kode_terpilih, "Tingkat Rak"
-      ].values[0]
+    kode_lama = pilih_brg.split(" - ")[0]
+    data_lama = df_barang.loc[df_barang["Kode Barang"] == kode_lama].iloc[0]
 
-      nama_rak_baru = st.text_input(
-          "Nama Rak / Area Gudang (Contoh: Rak Besi A, Gudang Utama)",
-          value=str(nama_rak_lama) if nama_rak_lama != "-" else "",
-      )
+    with st.form("form_edit_semua"):
+      kode_baru_input = st.text_input("Kode Barang", value=str(data_lama["Kode Barang"]))
+      nama_baru_input = st.text_input("Nama Barang", value=str(data_lama["Nama Barang"]))
+      kategori_baru_input = st.text_input("Kategori", value=str(data_lama["Kategori"]))
+
+      nama_rak_baru = st.text_input("Nama Rak / Area", value=str(data_lama["Nama Rak"]))
 
       col_e1, col_e2 = st.columns(2)
       with col_e1:
-        nomor_rak_baru = st.text_input(
-            "Nomor Kolom / Blok Rak (Contoh: Rak 1, Rak 2)",
-            value=str(nomor_rak_lama) if nomor_rak_lama != "-" else "",
-        )
+        nomor_rak_baru = st.text_input("Nomor Rak / Kolom", value=str(data_lama["Nomor Rak"]))
       with col_e2:
-        tingkat_baru = st.selectbox(
-            "Tingkat / Level Rak",
-            ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"],
-            index=(
-                0
-                if tingkat_lama
-                not in [
-                    "Level 1 (Bawah)",
-                    "Level 2",
-                    "Level 3",
-                    "Level 4 (Atas)",
-                ]
-                else [
-                    "Level 1 (Bawah)",
-                    "Level 2",
-                    "Level 3",
-                    "Level 4 (Atas)",
-                ].index(tingkat_lama)
-            ),
+        tingkat_ opsi = ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"]
+        default_tingkat = (
+            tingkat_opsi.index(data_lama["Tingkat Rak"])
+            if data_lama["Tingkat Rak"] in tingkat_opsi
+            else 0
         )
+        tingkat_baru = st.selectbox("Tingkat / Level Rak", tingkat_opsi, index=default_tingkat)
 
-      submit_edit = st.form_submit_button("Simpan Perubahan Lokasi Rak")
+      stok_baru = st.number_input("Stok Sistem", min_value=0, step=1, value=int(data_lama["Stok Sistem"]))
+       harga_baru = st.number_input("Harga Satuan (Rp)", min_value=0.0, step=1000.0, format="%.2f", value=float(data_lama["Harga Satuan"]))
 
-      if submit_edit:
-        df_barang.loc[
-            df_barang["Kode Barang"] == kode_terpilih, "Nama Rak"
-        ] = (nama_rak_baru if nama_rak_baru else "-")
-        df_barang.loc[
-            df_barang["Kode Barang"] == kode_terpilih, "Nomor Rak"
-        ] = (nomor_rak_baru if nomor_rak_baru else "-")
-        df_barang.loc[
-            df_barang["Kode Barang"] == kode_terpilih, "Tingkat Rak"
-        ] = tingkat_baru
+      submit_simpan_edit = st.form_submit_button("💾 Simpan Perubahan Data")
+
+      if submit_simpan_edit:
+        # Update baris data
+        df_barang.loc[df_barang["Kode Barang"] == kode_lama, "Kode Barang"] = kode_baru_input
+        df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Nama Barang"] = nama_baru_input
+        df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Kategori"] = kategori_baru_input
+        df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Nama Rak"] = nama_rak_baru
+        df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Nomor Rak"] = nomor_rak_baru
+        df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Tingkat Rak"] = tingkat_baru
+        df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Stok Sistem"] = stok_baru
+        df_barang.loc[df_barang["Kode Barang"] == kode_baru_input, "Harga Satuan"] = harga_baru
+
         df_barang.to_csv(DB_BARANG, index=False)
-        st.success(
-            f"Lokasi rak untuk barang `{kode_terpilih}` berhasil diperbarui!"
-        )
+        st.success(f"Data barang `{nama_baru_input}` berhasil diperbarui secara keseluruhan!")
         st.rerun()
 
 # ==========================================
@@ -361,8 +330,8 @@ elif menu == "📋 Stok Opname":
       with col1:
         st.write(
             f"**{row['Nama Barang']}** (`{row['Kode Barang']}`)"
-            f" <br><small><b>Kategori:</b> {row['Kategori']} | <b>Rak:</b>"
-            f" {row['Nama Rak']} - {row['Nomor Rak']} ({row['Tingkat Rak']})</small>",
+            f" <br><small><b>Rak:</b> {row['Nama Rak']} - {row['Nomor Rak']}"
+            f" ({row['Tingkat Rak']})</small>",
             unsafe_allow_html=True,
         )
       with col2:
@@ -394,7 +363,7 @@ elif menu == "📋 Stok Opname":
 
       st.markdown("---")
       st.subheader("Hasil Laporan Stok Opname")
-      df_opname_styled = df_opname.style.apply(warnai_kategori, axis=1)
+      df_opname_styled = df_opname.style.apply(warnai_material, axis=1)
       st.dataframe(df_opname_styled, use_container_width=True)
 
       if st.button("💾 Sinkronkan Stok Sistem dengan Fisik Aktual"):
@@ -415,10 +384,10 @@ elif menu == "➕ Tambah Barang Baru":
 
   with st.form("form_tambah_barang"):
     kode_baru = st.text_input("Kode Barang (Contoh: BRG001)")
-    nama_baru = st.text_input("Nama Barang")
-    kategori = st.text_input(
-        "Kategori Barang (Contoh: Karton, Plastik, Sheet, Aseptic)"
+    nama_baru = st.text_input(
+        "Nama Barang (Contoh: Aseptic bag 1400L, Karton Recu)"
     )
+    kategori = st.text_input("Kategori (Opsional)")
 
     nama_rak = st.text_input(
         "Nama Rak / Area (Contoh: Rak Besi A, Gudang Utama)"
@@ -449,7 +418,7 @@ elif menu == "➕ Tambah Barang Baru":
         new_row = pd.DataFrame([{
             "Kode Barang": kode_baru,
             "Nama Barang": nama_baru,
-            "Kategori": kategori if kategori else "Umum",
+            "Kategori": kategori if kategori else "-",
             "Nama Rak": nama_rak if nama_rak else "-",
             "Nomor Rak": nomor_rak if nomor_rak else "-",
             "Tingkat Rak": tingkat_rak,
@@ -458,6 +427,4 @@ elif menu == "➕ Tambah Barang Baru":
         }])
         df_barang = pd.concat([df_barang, new_row], ignore_index=True)
         df_barang.to_csv(DB_BARANG, index=False)
-        st.success(
-            f"Barang {nama_baru} (Kategori: {kategori}) berhasil disimpan!"
-        )
+        st.success(f"Barang {nama_baru} berhasil disimpan!")
