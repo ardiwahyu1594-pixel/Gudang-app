@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 import os
 import pandas as pd
 import streamlit as st
@@ -22,6 +22,9 @@ def init_db():
             "Nama Barang",
             "Kategori",
             "Warna Label",
+            "Tgl Kedatangan",
+            "Tgl Produksi",
+            "Tgl Expire",
             "Nama Rak",
             "Nomor Rak",
             "Tingkat Rak",
@@ -51,6 +54,12 @@ init_db()
 df_barang = pd.read_csv(DB_BARANG)
 
 # Perbaikan otomatis jika kolom versi lama belum ada
+if "Tgl Kedatangan" not in df_barang.columns:
+  df_barang["Tgl Kedatangan"] = "-"
+if "Tgl Produksi" not in df_barang.columns:
+  df_barang["Tgl Produksi"] = "-"
+if "Tgl Expire" not in df_barang.columns:
+  df_barang["Tgl Expire"] = "-"
 if "Warna Label" not in df_barang.columns:
   df_barang["Warna Label"] = "Putih (Normal)"
 if "Nama Rak" not in df_barang.columns:
@@ -93,6 +102,7 @@ menu = st.sidebar.selectbox(
         "📊 Dashboard Stok",
         "📍 Pemetaan Rak",
         "✏️ Edit Data Barang",
+        "🗑️ Hapus Barang",
         "📥 Barang Masuk",
         "📤 Barang Keluar",
         "📋 Stok Opname",
@@ -104,7 +114,7 @@ menu = st.sidebar.selectbox(
 # 1. DASHBOARD STOK
 # ==========================================
 if menu == "📊 Dashboard Stok":
-  st.title("📊 Dashboard Stok & Lokasi Gudang")
+  st.title("📊 Dashboard Stok & Masa Simpan Gudang")
   st.markdown("---")
 
   if df_barang.empty:
@@ -117,7 +127,7 @@ if menu == "📊 Dashboard Stok":
     col1.metric("Total Jenis Barang", f"{total_jenis} Jenis")
     col2.metric("Total Unit dalam Stok", f"{total_item} Unit")
 
-    st.subheader("Daftar Inventaris Gudang")
+    st.subheader("Daftar Inventaris Lengkap dengan Tanggal Kedatangan & Expire")
     df_styled = df_barang.style.apply(warnai_manual, axis=1)
     st.dataframe(df_styled, use_container_width=True)
 
@@ -146,8 +156,8 @@ elif menu == "📍 Pemetaan Rak":
     df_tampil_styled = df_tampil[[
         "Kode Barang",
         "Nama Barang",
-        "Kategori",
-        "Warna Label",
+        "Tgl Kedatangan",
+        "Tgl Expire",
         "Nama Rak",
         "Nomor Rak",
         "Tingkat Rak",
@@ -156,10 +166,10 @@ elif menu == "📍 Pemetaan Rak":
     st.dataframe(df_tampil_styled, use_container_width=True)
 
 # ==========================================
-# 3. EDIT DATA BARANG (SEMUA KOLOM)
+# 3. EDIT DATA BARANG
 # ==========================================
 elif menu == "✏️ Edit Data Barang":
-  st.title("✏️ Edit Lengkap Data Barang & Warna Label")
+  st.title("✏️ Edit Lengkap Data, Tanggal & Lokasi Rak")
   st.markdown(
       "Pilih barang yang ingin diubah, lalu perbarui informasi datanya di"
       " bawah."
@@ -178,11 +188,52 @@ elif menu == "✏️ Edit Data Barang":
     data_lama = df_barang.loc[df_barang["Kode Barang"] == kode_lama].iloc[0]
 
     with st.form("form_edit_semua"):
-      kode_baru_input = st.text_input("Kode Barang", value=str(data_lama["Kode Barang"]))
-      nama_baru_input = st.text_input("Nama Barang", value=str(data_lama["Nama Barang"]))
-      kategori_baru_input = st.text_input("Kategori", value=str(data_lama["Kategori"]))
+      kode_baru_input = st.text_input(
+          "Kode Barang", value=str(data_lama["Kode Barang"])
+      )
+      nama_baru_input = st.text_input(
+          "Nama Barang", value=str(data_lama["Nama Barang"])
+      )
+      kategori_baru_input = st.text_input(
+          "Kategori", value=str(data_lama["Kategori"])
+      )
 
-      # Pilihan Warna Manual
+      # Tanggal Edit
+      try:
+        def_tgl_datang = (
+            datetime.strptime(str(data_lama["Tgl Kedatangan"]), "%Y-%m-%d").date()
+            if data_lama["Tgl Kedatangan"] != "-"
+            else date.today()
+        )
+      except:
+        def_tgl_datang = date.today()
+
+      try:
+        def_tgl_prod = (
+            datetime.strptime(str(data_lama["Tgl Produksi"]), "%Y-%m-%d").date()
+            if data_lama["Tgl Produksi"] != "-"
+            else date.today()
+        )
+      except:
+        def_tgl_prod = date.today()
+
+      try:
+        def_tgl_exp = (
+            datetime.strptime(str(data_lama["Tgl Expire"]), "%Y-%m-%d").date()
+            if data_lama["Tgl Expire"] != "-"
+            else date.today()
+        )
+      except:
+        def_tgl_exp = date.today()
+
+      col_t1, col_t2, col_t3 = st.columns(3)
+      with col_t1:
+        tgl_datang_baru = st.date_input("Tanggal Kedatangan", value=def_tgl_datang)
+      with col_t2:
+        tgl_prod_baru = st.date_input("Tanggal Produksi", value=def_tgl_prod)
+      with col_t3:
+        tgl_exp_baru = st.date_input("Tanggal Expire", value=def_tgl_exp)
+
       pilihan_warna = [
           "Putih (Normal)",
           "Biru Muda (Karton/Box)",
@@ -202,20 +253,37 @@ elif menu == "✏️ Edit Data Barang":
           index=pilihan_warna.index(warna_lama),
       )
 
-      nama_rak_baru = st.text_input("Nama Rak / Area", value=str(data_lama["Nama Rak"]))
+      nama_rak_baru = st.text_input(
+          "Nama Rak / Area", value=str(data_lama["Nama Rak"])
+      )
 
-      col_e1, col_e2 = st.columns(2)
-      with col_e1:
-        nomor_rak_baru = st.text_input("Nomor Rak / Kolom", value=str(data_lama["Nomor Rak"]))
-      with col_e2:
+      col_r1, col_r2 = st.columns(2)
+      with col_r1:
+        nomor_rak_baru = st.text_input(
+            "Nomor Rak / Kolom", value=str(data_lama["Nomor Rak"])
+        )
+      with col_r2:
         tingkat_opsi = ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"]
         default_idx = 0
         if data_lama["Tingkat Rak"] in tingkat_opsi:
           default_idx = tingkat_opsi.index(data_lama["Tingkat Rak"])
-        tingkat_baru = st.selectbox("Tingkat / Level Rak", tingkat_opsi, index=default_idx)
+        tingkat_baru = st.selectbox(
+            "Tingkat / Level Rak", tingkat_opsi, index=default_idx
+        )
 
-      stok_baru = st.number_input("Stok Sistem", min_value=0, step=1, value=int(data_lama["Stok Sistem"]))
-      harga_baru = st.number_input("Harga Satuan (Rp)", min_value=0.0, step=1000.0, format="%.2f", value=float(data_lama["Harga Satuan"]))
+      stok_baru = st.number_input(
+          "Stok Sistem",
+          min_value=0,
+          step=1,
+          value=int(data_lama["Stok Sistem"]),
+      )
+      harga_baru = st.number_input(
+          "Harga Satuan (Rp)",
+          min_value=0.0,
+          step=1000.0,
+          format="%.2f",
+          value=float(data_lama["Harga Satuan"]),
+      )
 
       submit_simpan_edit = st.form_submit_button("💾 Simpan Perubahan Data")
 
@@ -224,6 +292,11 @@ elif menu == "✏️ Edit Data Barang":
         df_barang.loc[idx, "Kode Barang"] = kode_baru_input
         df_barang.loc[idx, "Nama Barang"] = nama_baru_input
         df_barang.loc[idx, "Kategori"] = kategori_baru_input
+        df_barang.loc[idx, "Tgl Kedatangan"] = tgl_datang_baru.strftime(
+            "%Y-%m-%d"
+        )
+        df_barang.loc[idx, "Tgl Produksi"] = tgl_prod_baru.strftime("%Y-%m-%d")
+        df_barang.loc[idx, "Tgl Expire"] = tgl_exp_baru.strftime("%Y-%m-%d")
         df_barang.loc[idx, "Warna Label"] = warna_baru
         df_barang.loc[idx, "Nama Rak"] = nama_rak_baru
         df_barang.loc[idx, "Nomor Rak"] = nomor_rak_baru
@@ -232,11 +305,43 @@ elif menu == "✏️ Edit Data Barang":
         df_barang.loc[idx, "Harga Satuan"] = harga_baru
 
         df_barang.to_csv(DB_BARANG, index=False)
-        st.success(f"Data barang `{nama_baru_input}` berhasil diperbarui!")
+        st.success(
+            f"Data barang `{nama_baru_input}` berhasil diperbarui dengan"
+            " tanggal!"
+        )
         st.rerun()
 
 # ==========================================
-# 4. BARANG MASUK
+# 4. HAPUS BARANG
+# ==========================================
+elif menu == "🗑️ Hapus Barang":
+  st.title("🗑️ Hapus Data Barang")
+  st.markdown("Pilih barang yang ingin dihapus dari daftar inventaris gudang.")
+  st.markdown("---")
+
+  if df_barang.empty:
+    st.info("Tidak ada data barang untuk dihapus.")
+  else:
+    with st.form("form_hapus_barang"):
+      pilih_hapus = st.selectbox(
+          "Pilih Barang yang Akan Dihapus",
+          df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
+      )
+      konfirmasi = st.checkbox("Saya yakin ingin menghapus barang ini")
+      submit_hapus = st.form_submit_button("🗑️ Hapus Barang")
+
+      if submit_hapus:
+        if konfirmasi:
+          kode_hapus = pilih_hapus.split(" - ")[0]
+          df_barang = df_barang[df_barang["Kode Barang"] != kode_hapus]
+          df_barang.to_csv(DB_BARANG, index=False)
+          st.success(f"Barang `{kode_hapus}` berhasil dihapus dari sistem!")
+          st.rerun()
+        else:
+          st.error("Silakan centang kotak konfirmasi terlebih dahulu!")
+
+# ==========================================
+# 5. BARANG MASUK
 # ==========================================
 elif menu == "📥 Barang Masuk":
   st.title("📥 Input Barang Masuk")
@@ -247,7 +352,8 @@ elif menu == "📥 Barang Masuk":
   else:
     with st.form("form_barang_masuk"):
       kode_pilih = st.selectbox(
-          "Pilih Barang", df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"]
+          "Pilih Barang",
+          df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
       )
       jumlah_masuk = st.number_input(
           "Jumlah Masuk", min_value=1, step=1, value=1
@@ -280,7 +386,7 @@ elif menu == "📥 Barang Masuk":
         st.success(f"Berhasil menambahkan {jumlah_masuk} unit ke {nama_barang}!")
 
 # ==========================================
-# 5. BARANG KELUAR
+# 6. BARANG KELUAR
 # ==========================================
 elif menu == "📤 Barang Keluar":
   st.title("📤 Input Barang Keluar")
@@ -291,7 +397,8 @@ elif menu == "📤 Barang Keluar":
   else:
     with st.form("form_barang_keluar"):
       kode_pilih = st.selectbox(
-          "Pilih Barang", df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"]
+          "Pilih Barang",
+          df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
       )
       jumlah_keluar = st.number_input(
           "Jumlah Keluar", min_value=1, step=1, value=1
@@ -329,10 +436,12 @@ elif menu == "📤 Barang Keluar":
           df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
           df_transaksi.to_csv(DB_TRANSAKSI, index=False)
 
-          st.success(f"Berhasil mengeluarkan {jumlah_keluar} unit {nama_barang}!")
+          st.success(
+              f"Berhasil mengeluarkan {jumlah_keluar} unit {nama_barang}!"
+          )
 
 # ==========================================
-# 6. STOK OPNAME
+# 7. STOK OPNAME
 # ==========================================
 elif menu == "📋 Stok Opname":
   st.title("📋 Cek Stok Opname (Audit Fisik)")
@@ -353,7 +462,7 @@ elif menu == "📋 Stok Opname":
         st.write(
             f"**{row['Nama Barang']}** (`{row['Kode Barang']}`)"
             f" <br><small><b>Rak:</b> {row['Nama Rak']} - {row['Nomor Rak']}"
-            f" ({row['Tingkat Rak']})</small>",
+            f" ({row['Tingkat Rak']}) | <b>Exp:</b> {row['Tgl Expire']}</small>",
             unsafe_allow_html=True,
         )
       with col2:
@@ -371,6 +480,9 @@ elif menu == "📋 Stok Opname":
           "Nama Barang": row["Nama Barang"],
           "Kategori": row["Kategori"],
           "Warna Label": row["Warna Label"],
+          "Tgl Kedatangan": row["Tgl Kedatangan"],
+          "Tgl Produksi": row["Tgl Produksi"],
+          "Tgl Expire": row["Tgl Expire"],
           "Nama Rak": row["Nama Rak"],
           "Nomor Rak": row["Nomor Rak"],
           "Tingkat Rak": row["Tingkat Rak"],
@@ -399,16 +511,25 @@ elif menu == "📋 Stok Opname":
         st.rerun()
 
 # ==========================================
-# 7. TAMBAH BARANG BARU
+# 8. TAMBAH BARANG BARU
 # ==========================================
 elif menu == "➕ Tambah Barang Baru":
-  st.title("➕ Tambah Master Barang & Warna Label")
+  st.title("➕ Tambah Master Barang, Tanggal & Lokasi")
   st.markdown("---")
 
   with st.form("form_tambah_barang"):
     kode_baru = st.text_input("Kode Barang (Contoh: BRG001)")
     nama_baru = st.text_input("Nama Barang")
     kategori = st.text_input("Kategori Barang")
+
+    # Pilihan Tanggal
+    col_t1, col_t2, col_t3 = st.columns(3)
+    with col_t1:
+      tgl_datang = st.date_input("Tanggal Kedatangan", value=date.today())
+    with col_t2:
+      tgl_prod = st.date_input("Tanggal Produksi", value=date.today())
+    with col_t3:
+      tgl_exp = st.date_input("Tanggal Expire", value=date.today())
 
     pilihan_warna = [
         "Putih (Normal)",
@@ -436,7 +557,7 @@ elif menu == "➕ Tambah Barang Baru":
         "Harga Satuan (Rp)", min_value=0.0, step=1000.0, format="%.2f"
     )
 
-    submit_barang = st.form_submit_button("Simpan Barang & Warna")
+    submit_barang = st.form_submit_button("Simpan Barang Lengkap")
 
     if submit_barang:
       if not kode_baru or not nama_baru:
@@ -449,6 +570,9 @@ elif menu == "➕ Tambah Barang Baru":
             "Nama Barang": nama_baru,
             "Kategori": kategori if kategori else "-",
             "Warna Label": warna_pilih,
+            "Tgl Kedatangan": tgl_datang.strftime("%Y-%m-%d"),
+            "Tgl Produksi": tgl_prod.strftime("%Y-%m-%d"),
+            "Tgl Expire": tgl_exp.strftime("%Y-%m-%d"),
             "Nama Rak": nama_rak if nama_rak else "-",
             "Nomor Rak": nomor_rak if nomor_rak else "-",
             "Tingkat Rak": tingkat_rak,
@@ -457,4 +581,7 @@ elif menu == "➕ Tambah Barang Baru":
         }])
         df_barang = pd.concat([df_barang, new_row], ignore_index=True)
         df_barang.to_csv(DB_BARANG, index=False)
-        st.success(f"Barang {nama_baru} berhasil disimpan dengan warna pilihan!")
+        st.success(
+            f"Barang `{nama_baru}` berhasil disimpan lengkap dengan tanggal"
+            " kedatangan & expire!"
+        )
