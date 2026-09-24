@@ -101,6 +101,7 @@ menu = st.sidebar.selectbox(
     [
         "📊 Dashboard Stok",
         "📍 Pemetaan Rak",
+        "📜 Riwayat Transaksi",
         "✏️ Edit Data Barang",
         "🗑️ Hapus Barang",
         "📥 Barang Masuk",
@@ -166,7 +167,35 @@ elif menu == "📍 Pemetaan Rak":
     st.dataframe(df_tampil_styled, use_container_width=True)
 
 # ==========================================
-# 3. EDIT DATA BARANG
+# 3. RIWAYAT TRANSAKSI (BARU)
+# ==========================================
+elif menu == "📜 Riwayat Transaksi":
+  st.title("📜 Riwayat Barang Masuk & Keluar")
+  st.markdown(
+      "Catatan seluruh aktivitas keluar masuk material beserta tanggal dan"
+      " jamnya."
+  )
+  st.markdown("---")
+
+  if df_transaksi.empty:
+    st.info("Belum ada riwayat transaksi barang masuk atau keluar.")
+  else:
+    # Filter tipe transaksi (Semua, MASUK, KELUAR)
+    filter_tipe = st.selectbox(
+        "Filter Tipe Transaksi", ["Semua", "MASUK", "KELUAR"]
+    )
+    if filter_tipe != "Semua":
+      df_trx_tampil = df_transaksi[df_transaksi["Tipe"] == filter_tipe]
+    else:
+      df_trx_tampil = df_transaksi
+
+    # Tampilkan urut dari yang paling baru
+    df_trx_tampil = df_trx_tampil.iloc[::-1]
+
+    st.dataframe(df_trx_tampil, use_container_width=True)
+
+# ==========================================
+# 4. EDIT DATA BARANG
 # ==========================================
 elif menu == "✏️ Edit Data Barang":
   st.title("✏️ Edit Lengkap Data, Tanggal & Lokasi Rak")
@@ -198,7 +227,6 @@ elif menu == "✏️ Edit Data Barang":
           "Kategori", value=str(data_lama["Kategori"])
       )
 
-      # Tanggal Edit
       try:
         def_tgl_datang = (
             datetime.strptime(str(data_lama["Tgl Kedatangan"]), "%Y-%m-%d").date()
@@ -228,7 +256,9 @@ elif menu == "✏️ Edit Data Barang":
 
       col_t1, col_t2, col_t3 = st.columns(3)
       with col_t1:
-        tgl_datang_baru = st.date_input("Tanggal Kedatangan", value=def_tgl_datang)
+        tgl_datang_baru = st.date_input(
+            "Tanggal Kedatangan", value=def_tgl_datang
+        )
       with col_t2:
         tgl_prod_baru = st.date_input("Tanggal Produksi", value=def_tgl_prod)
       with col_t3:
@@ -305,14 +335,11 @@ elif menu == "✏️ Edit Data Barang":
         df_barang.loc[idx, "Harga Satuan"] = harga_baru
 
         df_barang.to_csv(DB_BARANG, index=False)
-        st.success(
-            f"Data barang `{nama_baru_input}` berhasil diperbarui dengan"
-            " tanggal!"
-        )
+        st.success(f"Data barang `{nama_baru_input}` berhasil diperbarui!")
         st.rerun()
 
 # ==========================================
-# 4. HAPUS BARANG
+# 5. HAPUS BARANG
 # ==========================================
 elif menu == "🗑️ Hapus Barang":
   st.title("🗑️ Hapus Data Barang")
@@ -341,7 +368,7 @@ elif menu == "🗑️ Hapus Barang":
           st.error("Silakan centang kotak konfirmasi terlebih dahulu!")
 
 # ==========================================
-# 5. BARANG MASUK
+# 6. BARANG MASUK
 # ==========================================
 elif menu == "📥 Barang Masuk":
   st.title("📥 Input Barang Masuk")
@@ -386,7 +413,7 @@ elif menu == "📥 Barang Masuk":
         st.success(f"Berhasil menambahkan {jumlah_masuk} unit ke {nama_barang}!")
 
 # ==========================================
-# 6. BARANG KELUAR
+# 7. BARANG KELUAR
 # ==========================================
 elif menu == "📤 Barang Keluar":
   st.title("📤 Input Barang Keluar")
@@ -441,7 +468,7 @@ elif menu == "📤 Barang Keluar":
           )
 
 # ==========================================
-# 7. STOK OPNAME
+# 8. STOK OPNAME
 # ==========================================
 elif menu == "📋 Stok Opname":
   st.title("📋 Cek Stok Opname (Audit Fisik)")
@@ -511,7 +538,7 @@ elif menu == "📋 Stok Opname":
         st.rerun()
 
 # ==========================================
-# 8. TAMBAH BARANG BARU
+# 9. TAMBAH BARANG BARU
 # ==========================================
 elif menu == "➕ Tambah Barang Baru":
   st.title("➕ Tambah Master Barang, Tanggal & Lokasi")
@@ -522,7 +549,6 @@ elif menu == "➕ Tambah Barang Baru":
     nama_baru = st.text_input("Nama Barang")
     kategori = st.text_input("Kategori Barang")
 
-    # Pilihan Tanggal
     col_t1, col_t2, col_t3 = st.columns(3)
     with col_t1:
       tgl_datang = st.date_input("Tanggal Kedatangan", value=date.today())
