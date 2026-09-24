@@ -160,7 +160,6 @@ elif menu == "📍 Pemetaan Rak (Visual)":
     if df_rak.empty:
       st.warning(f"Belum ada material di {pilih_nama_rak}.")
     else:
-      # Urutkan berdasarkan tingkat dari atas ke bawah atau sebaliknya
       tingkat_list = [
           "Level 4 (Atas)",
           "Level 3",
@@ -172,12 +171,8 @@ elif menu == "📍 Pemetaan Rak (Visual)":
         df_lvl = df_rak[df_rak["Tingkat Rak"] == lvl]
         if not df_lvl.empty:
           with st.container():
-            st.markdown(
-                f"**🪜 {lvl}** *(Struktur Rak Besi Bertingkat)*"
-            )
-            cols = st.columns(
-                min(len(df_lvl), 3)
-            )  # Buat kotak grid per kolom rak
+            st.markdown(f"**🪜 {lvl}**")
+            cols = st.columns(min(len(df_lvl), 3))
             for i, (_, row) in enumerate(df_lvl.iterrows()):
               with cols[i % len(cols)]:
                 st.info(
@@ -186,6 +181,7 @@ elif menu == "📍 Pemetaan Rak (Visual)":
                     f"🔖 **Batch:** {row['No Batch']}\n\n"
                     f"📌 **Blok/Kolom:** {row['Nomor Rak']}\n\n"
                     f"📦 **Stok:** {row['Stok Sistem']} {row['Satuan']}\n\n"
+                    f"🏭 **Prod:** {row['Tgl Produksi']}\n\n"
                     f"⏳ **Exp:** {row['Tgl Expire']}"
                 )
             st.markdown("---")
@@ -199,6 +195,7 @@ elif menu == "📍 Pemetaan Rak (Visual)":
           "Tingkat Rak",
           "Stok Sistem",
           "Satuan",
+          "Tgl Produksi",
           "Tgl Expire",
       ]].style.apply(warnai_manual, axis=1)
       st.dataframe(df_tampil_styled, use_container_width=True)
@@ -261,6 +258,16 @@ elif menu == "✏️ Edit Data Barang":
       )
       kategori_baru_input = st.text_input(
           "Kategori", value=str(data_lama["Kategori"])
+      )
+
+      # Checkbox Tanggal Produksi & Expire
+      ada_tgl_prod = st.checkbox(
+          "Ada Tanggal Produksi?",
+          value=(True if data_lama["Tgl Produksi"] != "-" else False),
+      )
+      ada_tgl_exp = st.checkbox(
+          "Ada Tanggal Expire?",
+          value=(True if data_lama["Tgl Expire"] != "-" else False),
       )
 
       try:
@@ -372,8 +379,12 @@ elif menu == "✏️ Edit Data Barang":
         df_barang.loc[idx, "Tgl Kedatangan"] = tgl_datang_baru.strftime(
             "%Y-%m-%d"
         )
-        df_barang.loc[idx, "Tgl Produksi"] = tgl_prod_baru.strftime("%Y-%m-%d")
-        df_barang.loc[idx, "Tgl Expire"] = tgl_exp_baru.strftime("%Y-%m-%d")
+        df_barang.loc[idx, "Tgl Produksi"] = (
+            tgl_prod_baru.strftime("%Y-%m-%d") if ada_tgl_prod else "-"
+        )
+        df_barang.loc[idx, "Tgl Expire"] = (
+            tgl_exp_baru.strftime("%Y-%m-%d") if ada_tgl_exp else "-"
+        )
         df_barang.loc[idx, "Warna Label"] = warna_baru
         df_barang.loc[idx, "Nama Rak"] = nama_rak_baru
         df_barang.loc[idx, "Nomor Rak"] = nomor_rak_baru
@@ -610,6 +621,16 @@ elif menu == "➕ Tambah Barang Baru":
     batch_baru = st.text_input("Lot / Batch No (Contoh: 3924497)")
     kategori = st.text_input("Kategori Barang (Contoh: Chemical)")
 
+    # Checkbox untuk opsi ada/tidaknya tanggal produksi dan expire
+    ada_tgl_prod_baru = st.checkbox(
+        "Ada Tanggal Produksi? (Centang jika ada, kosongkan jika tidak ada)",
+        value=True,
+    )
+    ada_tgl_exp_baru = st.checkbox(
+        "Ada Tanggal Expire? (Centang jika ada, kosongkan jika tidak ada)",
+        value=True,
+    )
+
     col_t1, col_t2, col_t3 = st.columns(3)
     with col_t1:
       tgl_datang = st.date_input("Incoming Date", value=date.today())
@@ -655,6 +676,12 @@ elif menu == "➕ Tambah Barang Baru":
       elif kode_baru in df_barang["Kode Barang"].values:
         st.error("Kode barang sudah terdaftar!")
       else:
+        final_tgl_prod = (
+            tgl_prod.strftime("%Y-%m-%d") if ada_tgl_prod_baru else "-"
+        )
+        final_tgl_exp = (
+            tgl_exp.strftime("%Y-%m-%d") if ada_tgl_exp_baru else "-"
+        )
         new_row = pd.DataFrame([{
             "Kode Barang": kode_baru,
             "Nama Barang": nama_baru,
@@ -662,8 +689,8 @@ elif menu == "➕ Tambah Barang Baru":
             "Kategori": kategori if kategori else "-",
             "Warna Label": warna_pilih,
             "Tgl Kedatangan": tgl_datang.strftime("%Y-%m-%d"),
-            "Tgl Produksi": tgl_prod.strftime("%Y-%m-%d"),
-            "Tgl Expire": tgl_exp.strftime("%Y-%m-%d"),
+            "Tgl Produksi": final_tgl_prod,
+            "Tgl Expire": final_tgl_exp,
             "Nama Rak": nama_rak if nama_rak else "-",
             "Nomor Rak": nomor_rak if nomor_rak else "-",
             "Tingkat Rak": tingkat_rak,
@@ -673,6 +700,6 @@ elif menu == "➕ Tambah Barang Baru":
         df_barang = pd.concat([df_barang, new_row], ignore_index=True)
         df_barang.to_csv(DB_BARANG, index=False)
         st.success(
-            f"Material `{nama_baru}` (Batch: `{batch_baru}`) berhasil disimpan"
-            f" di {nama_rak}!"
+            f"Material `{nama_baru}` berhasil disimpan (Prode Date:"
+            f" {final_tgl_prod} | Exp Date: {final_tgl_exp})!"
         )
