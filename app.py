@@ -103,130 +103,104 @@ def warnai_manual(row):
     return [""] * len(row)
 
 
-# Judul Utama Aplikasi di HP
-st.title("📦 Aplikasi Manajemen Gudang")
-
-# Navigasi Model Tab Menu di Atas (Horizontal Tabs) yang Nyaman untuk HP
-menu = st.tabs([
-    "📊 Dashboard",
-    "📷 Scan/Cek Rak",
-    "📍 Pemetaan",
-    "📥 Masuk",
-    "📤 Keluar",
-    "📜 Riwayat",
-    "✏️ Edit",
-    "🗑️ Hapus",
-    "📋 Opname",
-    "➕ Tambah",
-])
+# Navigasi Sidebar
+st.sidebar.title("📌 Menu Gudang")
+menu = st.sidebar.selectbox(
+    "Pilih Menu",
+    [
+        "📊 Dashboard Stok",
+        "📷 Scan Barcode / Cek Rak",
+        "📍 Pemetaan Rak (Visual)",
+        "📜 Riwayat Transaksi",
+        "✏️ Edit Data Barang",
+        "🗑️ Hapus Barang",
+        "📥 Barang Masuk",
+        "📤 Barang Keluar",
+        "📋 Stok Opname",
+        "➕ Tambah Barang Baru",
+    ],
+)
 
 # ==========================================
-# 1. DASHBOARD STOK
+# 1. DASHBOARD STOK (DENGAN PENCARIAN & GRAFIK)
 # ==========================================
-with menu[0]:
-  st.subheader("📊 Dashboard Stok & Ringkasan Material")
+if menu == "📊 Dashboard Stok":
+  st.title("📊 Dashboard Stok & Statistik Gudang")
   st.markdown("---")
 
   if df_barang.empty:
-    st.info("Belum ada data barang. Silakan tambah barang baru melalui menu ➕.")
+    st.info("Belum ada data barang. Silakan tambah barang baru melalui menu.")
   else:
     total_jenis = len(df_barang)
     total_item = df_barang["Stok Sistem"].sum()
 
     col1, col2 = st.columns(2)
-    col1.metric("Total Jenis / Lot", f"{total_jenis} Jenis")
-    col2.metric("Total Qty Unit", f"{total_item} Unit")
+    col1.metric("Total Jenis / Lot Barang", f"{total_jenis} Jenis")
+    col2.metric("Total Qty Seluruh Unit", f"{total_item} Unit")
 
     st.markdown("---")
-    # Fitur Pencarian Cepat
+    # Fitur Pencarian Cepat (Quick Search)
+    st.subheader("🔍 Pencarian Cepat Material / Batch")
     keyword = st.text_input(
-        "🔍 Ketik nama barang, kode, atau no batch untuk mencari:"
+        "Ketik nama barang, kode, atau no batch yang ingin dicari:"
     )
 
     if keyword:
-      df_sumber = df_barang[
+      hasil_cari = df_barang[
           df_barang.astype(str)
           .apply(lambda row: row.str.contains(keyword, case=False).any(), axis=1)
       ]
       st.write(
-          f"Ditemukan {len(df_sumber)} hasil untuk kata kunci: **{keyword}**"
+          f"Ditemukan {len(hasil_cari)} hasil untuk kata kunci:"
+          f" **{keyword}**"
       )
-    else:
-      df_sumber = df_barang
-
-    if not df_sumber.empty:
-      st.markdown("### 📋 Ringkasan Stok Utama")
-      kolom_ringkas = [
-          "Kode Barang",
-          "Nama Barang",
-          "Stok Sistem",
-          "Satuan",
-          "Nama Rak",
-          "Nomor Rak",
-          "Tgl Kedatangan",
-      ]
-      df_ringkas_styled = df_sumber[kolom_ringkas].style.apply(
-          warnai_manual, axis=1
-      )
-      st.dataframe(df_ringkas_styled, use_container_width=True)
-
-      st.markdown("---")
-      st.markdown("### 🔎 Lihat Detail Lengkap Material")
-      pilih_detail = st.selectbox(
-          "Pilih Material untuk Melihat Batch, Prod. & Exp. Date",
-          df_sumber["Kode Barang"] + " - " + df_sumber["Nama Barang"],
-      )
-
-      if pilih_detail:
-        kode_pilih = pilih_detail.split(" - ")[0]
-        row_detail = df_sumber[df_sumber["Kode Barang"] == kode_pilih].iloc[0]
-
-        st.info(
-            f"📦 **Nama Material:** {row_detail['Nama Barang']}\n\n"
-            f"🏷️ **Kode Barang:** `{row_detail['Kode Barang']}`\n\n"
-            f"🔖 **No Batch / Lot No:** `{row_detail['No Batch']}`\n\n"
-            f"🏷️ **Kategori:** {row_detail['Kategori']} | 🎨 **Label:**"
-            f" {row_detail['Warna Label']}\n\n"
-            f"📍 **Lokasi Rak:** {row_detail['Nama Rak']} - Kolom"
-            f" {row_detail['Nomor Rak']} ({row_detail['Tingkat Rak']})\n\n"
-            f"📊 **Stok Saat Ini:** **{row_detail['Stok Sistem']}"
-            f" {row_detail['Satuan']}**\n\n"
-            f"📥 **Incoming Date (Kedatangan):**"
-            f" `{row_detail['Tgl Kedatangan']}`\n\n"
-            f"🏭 **Prode Date (Produksi):** `{row_detail['Tgl Produksi']}`\n\n"
-            f"⏳ **Exp. Date (Kadaluarsa):** `{row_detail['Tgl Expire']}`"
+      if not hasil_cari.empty:
+        st.dataframe(
+            hasil_cari.style.apply(warnai_manual, axis=1),
+            use_container_width=True,
         )
+      else:
+        st.warning("Material tidak ditemukan.")
     else:
-      st.warning("Material tidak ditemukan.")
+      st.subheader("Daftar Inventaris Lengkap")
+      df_styled = df_barang.style.apply(warnai_manual, axis=1)
+      st.dataframe(df_styled, use_container_width=True)
 
+    # Grafik Ringkasan Statistik Stok per Kategori / Rak
     st.markdown("---")
-    st.markdown("### 📈 Grafik Statistik Stok per Rak")
+    st.subheader("📈 Grafik Statistik Stok per Rak")
     if "Nama Rak" in df_barang.columns and not df_barang.empty:
       df_grafik = df_barang.groupby("Nama Rak")["Stok Sistem"].sum()
       st.bar_chart(df_grafik)
 
 # ==========================================
-# 2. SCAN BARCODE / CEK RAK
+# 2. SCAN BARCODE / CEK RAK INSTAN
 # ==========================================
-with menu[1]:
-  st.subheader("📷 Scan Barcode / Cek Rak Instan")
+elif menu == "📷 Scan Barcode / Cek Rak":
+  st.title("📷 Scan Barcode / Cek Rak Instan")
   st.markdown(
-      "Gunakan kamera HP atau pilih nama rak untuk melihat seluruh isi barang."
+      "Gunakan kamera HP untuk scan barcode rak atau pilih nama rak di bawah"
+      " untuk melihat semua isi barangnya secara instan."
   )
   st.markdown("---")
 
-  gambar_kamera = st.camera_input("Ambil Foto Barcode Rak")
+  # Opsi A: Simulasi Scan Kamera HP
+  st.subheader("1️⃣ Kamera Scanner Barcode / QR")
+  gambar_kamera = st.camera_input("Ambil Foto Barcode Rak (Opsional)")
   if gambar_kamera:
     st.success("Barcode berhasil dipindai oleh kamera!")
 
   st.markdown("---")
+
+  # Opsi B: Filter Cepat per Rak (Muncul Semua Barang di Rak Tersebut)
+  st.subheader("2️⃣ Pilih / Ketik Rak untuk Menampilkan Semua Isinya")
   if df_barang.empty:
     st.info("Belum ada data barang di gudang.")
   else:
     daftar_rak = ["-- Pilih Nama Rak --"] + sorted(
         df_barang["Nama Rak"].dropna().unique().tolist()
     )
-    pilih_rak_scan = st.selectbox("Pilih Nama Rak / Area Gudang", daftar_rak)
+    pilih_rak_scan = st.selectbox("Pilih Nama Rak / Area", daftar_rak)
 
     if pilih_rak_scan != "-- Pilih Nama Rak --":
       df_hasil_rak = df_barang[df_barang["Nama Rak"] == pilih_rak_scan]
@@ -234,6 +208,7 @@ with menu[1]:
           f"Ditemukan {len(df_hasil_rak)} jenis material di **{pilih_rak_scan}**:"
       )
 
+      # Tampilkan dalam bentuk kartu ringkas agar mudah dibaca di HP
       for _, row in df_hasil_rak.iterrows():
         st.info(
             f"📦 **{row['Nama Barang']}**\n\n"
@@ -241,17 +216,19 @@ with menu[1]:
             f" `{row['No Batch']}`\n\n"
             f"📌 **Lokasi:** {row['Nama Rak']} - No. {row['Nomor Rak']} ("
             f"{row['Tingkat Rak']})\n\n"
-            f"📊 **Stok:** **{row['Stok Sistem']} {row['Satuan']}** | 📥"
-            f" **Datang:** {row['Tgl Kedatangan']} | ⏳ **Exp:**"
+            f"📊 **Stok:** **{row['Stok Sistem']} {row['Satuan']}** | ⏳ **Exp:**"
             f" {row['Tgl Expire']}"
         )
 
 # ==========================================
 # 3. PEMETAAN RAK (VISUAL)
 # ==========================================
-with menu[2]:
-  st.subheader("📍 Layout & Pemetaan Posisi Rak Bertingkat")
-  st.markdown("Visualisasi penempatan material per rak.")
+elif menu == "📍 Pemetaan Rak (Visual)":
+  st.title("📍 Layout & Pemetaan Posisi Rak Bertingkat")
+  st.markdown(
+      "Visualisasi penempatan material berdasarkan Nama Rak, Nomor Kolom, dan"
+      " Tingkat Rak."
+  )
   st.markdown("---")
 
   if df_barang.empty:
@@ -259,9 +236,7 @@ with menu[2]:
   else:
     daftar_nama_rak = sorted(df_barang["Nama Rak"].dropna().unique().tolist())
     pilih_nama_rak = st.selectbox(
-        "🏢 Pilih Nama Rak / Area Gudang",
-        daftar_nama_rak,
-        key="pilih_rak_visual",
+        "🏢 Pilih Nama Rak / Area Gudang", daftar_nama_rak
     )
 
     st.markdown(f"### 📦 Visualisasi Rak: **{pilih_nama_rak}**")
@@ -291,120 +266,31 @@ with menu[2]:
                     f"🔖 **Batch:** {row['No Batch']}\n\n"
                     f"📌 **Blok/Kolom:** {row['Nomor Rak']}\n\n"
                     f"📦 **Stok:** {row['Stok Sistem']} {row['Satuan']}\n\n"
-                    f"📥 **Datang:** {row['Tgl Kedatangan']}\n\n"
+                    f"🏭 **Prod:** {row['Tgl Produksi']}\n\n"
                     f"⏳ **Exp:** {row['Tgl Expire']}"
                 )
             st.markdown("---")
 
-# ==========================================
-# 4. BARANG MASUK
-# ==========================================
-with menu[3]:
-  st.subheader("📥 Input Barang Masuk")
-  st.markdown("---")
-
-  if df_barang.empty:
-    st.warning("Tambahkan master barang terlebih dahulu di menu ➕!")
-  else:
-    with st.form("form_barang_masuk"):
-      kode_pilih = st.selectbox(
-          "Pilih Barang",
-          df_barang["Kode Barang"]
-          + " - "
-          + df_barang["Nama Barang"]
-          + " ("
-          + df_barang["Satuan"]
-          + ")",
-      )
-      jumlah_masuk = st.number_input(
-          "Jumlah Masuk", min_value=1, step=1, value=1
-      )
-      keterangan = st.text_input("Keterangan / Supplier", "Pembelian Baru")
-      submit = st.form_submit_button("Simpan Barang Masuk")
-
-      if submit:
-        kode_barang = kode_pilih.split(" - ")[0]
-        idx = df_barang[df_barang["Kode Barang"] == kode_barang].index[0]
-        nama_barang = df_barang.loc[idx, "Nama Barang"]
-
-        df_barang.loc[idx, "Stok Sistem"] += jumlah_masuk
-        df_barang.to_csv(DB_BARANG, index=False)
-
-        new_trx = pd.DataFrame([{
-            "Tanggal": get_waktu_wib(),
-            "Kode Barang": kode_barang,
-            "Nama Barang": nama_barang,
-            "Tipe": "MASUK",
-            "Jumlah": jumlah_masuk,
-            "Keterangan": keterangan,
-        }])
-        df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
-        df_transaksi.to_csv(DB_TRANSAKSI, index=False)
-
-        st.success(f"Berhasil menambahkan {jumlah_masuk} unit ke {nama_barang}!")
+      st.subheader(f"📋 Tabel Detail Rak {pilih_nama_rak}")
+      df_tampil_styled = df_rak[[
+          "Kode Barang",
+          "Nama Barang",
+          "No Batch",
+          "Nomor Rak",
+          "Tingkat Rak",
+          "Stok Sistem",
+          "Satuan",
+          "Tgl Produksi",
+          "Tgl Expire",
+      ]].style.apply(warnai_manual, axis=1)
+      st.dataframe(df_tampil_styled, use_container_width=True)
 
 # ==========================================
-# 5. BARANG KELUAR
+# 4. RIWAYAT TRANSAKSI
 # ==========================================
-with menu[4]:
-  st.subheader("📤 Input Barang Keluar")
-  st.markdown("---")
-
-  if df_barang.empty:
-    st.warning("Belum ada data barang!")
-  else:
-    with st.form("form_barang_keluar"):
-      kode_pilih = st.selectbox(
-          "Pilih Barang",
-          df_barang["Kode Barang"]
-          + " - "
-          + df_barang["Nama Barang"]
-          + " ("
-          + df_barang["Satuan"]
-          + ")",
-          key="pilih_keluar",
-      )
-      jumlah_keluar = st.number_input(
-          "Jumlah Keluar", min_value=1, step=1, value=1
-      )
-      keterangan = st.text_input("Keterangan / Tujuan", "Pengiriman ke Toko")
-      submit = st.form_submit_button("Simpan Barang Keluar")
-
-      if submit:
-        kode_barang = kode_pilih.split(" - ")[0]
-        idx = df_barang[df_barang["Kode Barang"] == kode_barang].index[0]
-        stok_sekarang = int(df_barang.loc[idx, "Stok Sistem"])
-        nama_barang = df_barang.loc[idx, "Nama Barang"]
-
-        if jumlah_keluar > stok_sekarang:
-          st.error(
-              f"Stok tidak mencukupi! Stok saat ini: {stok_sekarang} unit."
-          )
-        else:
-          df_barang.loc[idx, "Stok Sistem"] -= jumlah_keluar
-          df_barang.to_csv(DB_BARANG, index=False)
-
-          new_trx = pd.DataFrame([{
-              "Tanggal": get_waktu_wib(),
-              "Kode Barang": kode_barang,
-              "Nama Barang": nama_barang,
-              "Tipe": "KELUAR",
-              "Jumlah": jumlah_keluar,
-              "Keterangan": keterangan,
-          }])
-          df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
-          df_transaksi.to_csv(DB_TRANSAKSI, index=False)
-
-          st.success(
-              f"Berhasil mengeluarkan {jumlah_keluar} unit {nama_barang}!"
-          )
-
-# ==========================================
-# 6. RIWAYAT TRANSAKSI
-# ==========================================
-with menu[5]:
-  st.subheader("📜 Riwayat Barang Masuk & Keluar")
-  st.markdown("Catatan aktivitas keluar masuk material beserta tanggal & jamnya.")
+elif menu == "📜 Riwayat Transaksi":
+  st.title("📜 Riwayat Barang Masuk & Keluar")
+  st.markdown("Catatan aktivitas keluar masuk material beserta tanggal dan jamnya.")
   st.markdown("---")
 
   if df_transaksi.empty:
@@ -422,10 +308,10 @@ with menu[5]:
     st.dataframe(df_trx_tampil, use_container_width=True)
 
 # ==========================================
-# 7. EDIT DATA BARANG
+# 5. EDIT DATA BARANG
 # ==========================================
-with menu[6]:
-  st.subheader("✏️ Edit Data Barang & Lokasi")
+elif menu == "✏️ Edit Data Barang":
+  st.title("✏️ Edit Lengkap Data, Batch & Satuan")
   st.markdown("Perbarui informasi material di gudang.")
   st.markdown("---")
 
@@ -435,7 +321,6 @@ with menu[6]:
     pilih_brg = st.selectbox(
         "Pilih Barang yang Ingin Diedit",
         df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
-        key="pilih_edit_barang",
     )
 
     kode_lama = pilih_brg.split(" - ")[0]
@@ -596,11 +481,11 @@ with menu[6]:
         st.rerun()
 
 # ==========================================
-# 8. HAPUS BARANG
+# 6. HAPUS BARANG
 # ==========================================
-with menu[7]:
-  st.subheader("🗑️ Hapus Data Barang")
-  st.markdown("Pilih barang yang ingin dihapus dari inventaris.")
+elif menu == "🗑️ Hapus Barang":
+  st.title("🗑️ Hapus Data Barang")
+  st.markdown("Pilih barang yang ingin dihapus dari daftar inventaris gudang.")
   st.markdown("---")
 
   if df_barang.empty:
@@ -610,7 +495,6 @@ with menu[7]:
       pilih_hapus = st.selectbox(
           "Pilih Barang yang Akan Dihapus",
           df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
-          key="pilih_hapus_barang",
       )
       konfirmasi = st.checkbox("Saya yakin ingin menghapus barang ini")
       submit_hapus = st.form_submit_button("🗑️ Hapus Barang")
@@ -626,17 +510,121 @@ with menu[7]:
           st.error("Silakan centang kotak konfirmasi terlebih dahulu!")
 
 # ==========================================
+# 7. BARANG MASUK
+# ==========================================
+elif menu == "📥 Barang Masuk":
+  st.title("📥 Input Barang Masuk")
+  st.markdown("---")
+
+  if df_barang.empty:
+    st.warning("Tambahkan master barang terlebih dahulu!")
+  else:
+    with st.form("form_barang_masuk"):
+      kode_pilih = st.selectbox(
+          "Pilih Barang",
+          df_barang["Kode Barang"]
+          + " - "
+          + df_barang["Nama Barang"]
+          + " ("
+          + df_barang["Satuan"]
+          + ")",
+      )
+      jumlah_masuk = st.number_input(
+          "Jumlah Masuk", min_value=1, step=1, value=1
+      )
+      keterangan = st.text_input("Keterangan / Supplier", "Pembelian Baru")
+      submit = st.form_submit_button("Simpan Barang Masuk")
+
+      if submit:
+        kode_barang = kode_pilih.split(" - ")[0]
+        idx = df_barang[df_barang["Kode Barang"] == kode_barang].index[0]
+        nama_barang = df_barang.loc[idx, "Nama Barang"]
+
+        df_barang.loc[idx, "Stok Sistem"] += jumlah_masuk
+        df_barang.to_csv(DB_BARANG, index=False)
+
+        new_trx = pd.DataFrame([{
+            "Tanggal": get_waktu_wib(),
+            "Kode Barang": kode_barang,
+            "Nama Barang": nama_barang,
+            "Tipe": "MASUK",
+            "Jumlah": jumlah_masuk,
+            "Keterangan": keterangan,
+        }])
+        df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
+        df_transaksi.to_csv(DB_TRANSAKSI, index=False)
+
+        st.success(f"Berhasil menambahkan {jumlah_masuk} unit ke {nama_barang}!")
+
+# ==========================================
+# 8. BARANG KELUAR
+# ==========================================
+elif menu == "📤 Barang Keluar":
+  st.title("📤 Input Barang Keluar")
+  st.markdown("---")
+
+  if df_barang.empty:
+    st.warning("Belum ada data barang!")
+  else:
+    with st.form("form_barang_keluar"):
+      kode_pilih = st.selectbox(
+          "Pilih Barang",
+          df_barang["Kode Barang"]
+          + " - "
+          + df_barang["Nama Barang"]
+          + " ("
+          + df_barang["Satuan"]
+          + ")",
+      )
+      jumlah_keluar = st.number_input(
+          "Jumlah Keluar", min_value=1, step=1, value=1
+      )
+      keterangan = st.text_input("Keterangan / Tujuan", "Pengiriman ke Toko")
+      submit = st.form_submit_button("Simpan Barang Keluar")
+
+      if submit:
+        kode_barang = kode_pilih.split(" - ")[0]
+        idx = df_barang[df_barang["Kode Barang"] == kode_barang].index[0]
+        stok_sekarang = int(df_barang.loc[idx, "Stok Sistem"])
+        nama_barang = df_barang.loc[idx, "Nama Barang"]
+
+        if jumlah_keluar > stok_sekarang:
+          st.error(
+              f"Stok tidak mencukupi! Stok saat ini: {stok_sekarang} unit."
+          )
+        else:
+          df_barang.loc[idx, "Stok Sistem"] -= jumlah_keluar
+          df_barang.to_csv(DB_BARANG, index=False)
+
+          new_trx = pd.DataFrame([{
+              "Tanggal": get_waktu_wib(),
+              "Kode Barang": kode_barang,
+              "Nama Barang": nama_barang,
+              "Tipe": "KELUAR",
+              "Jumlah": jumlah_keluar,
+              "Keterangan": keterangan,
+          }])
+          df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
+          df_transaksi.to_csv(DB_TRANSAKSI, index=False)
+
+          st.success(
+              f"Berhasil mengeluarkan {jumlah_keluar} unit {nama_barang}!"
+          )
+
+# ==========================================
 # 9. STOK OPNAME
 # ==========================================
-with menu[8]:
-  st.subheader("📋 Cek Stok Opname (Audit Fisik)")
-  st.markdown("Bandingkan jumlah stok sistem dengan perhitungan fisik di rak.")
+elif menu == "📋 Stok Opname":
+  st.title("📋 Cek Stok Opname (Audit Fisik)")
+  st.markdown(
+      "Bandingkan jumlah stok sistem dengan perhitungan fisik di rak gudang."
+  )
   st.markdown("---")
 
   if df_barang.empty:
     st.info("Belum ada data barang untuk di-opname.")
   else:
-    st.markdown("### Formulir Audit Fisik per Rak")
+    st.subheader("Formulir Audit Fisik per Rak")
 
     opname_data = []
     for index, row in df_barang.iterrows():
@@ -646,7 +634,7 @@ with menu[8]:
             f"**{row['Nama Barang']}** (`{row['Kode Barang']}`)"
             f" <br><small><b>Batch:</b> {row['No Batch']} | <b>Rak:</b>"
             f" {row['Nama Rak']}-{row['Nomor Rak']} ({row['Tingkat Rak']})"
-            f" | <b>Datang:</b> {row['Tgl Kedatangan']}</small>",
+            f" | <b>Exp:</b> {row['Tgl Expire']}</small>",
             unsafe_allow_html=True,
         )
       with col2:
@@ -699,8 +687,8 @@ with menu[8]:
 # ==========================================
 # 10. TAMBAH BARANG BARU
 # ==========================================
-with menu[9]:
-  st.subheader("➕ Tambah Master Material & Form Identifikasi")
+elif menu == "➕ Tambah Barang Baru":
+  st.title("➕ Tambah Master Material & Form Identifikasi")
   st.markdown("---")
 
   with st.form("form_tambah_barang"):
