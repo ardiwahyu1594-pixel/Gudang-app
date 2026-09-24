@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 import os
 import pandas as pd
 import streamlit as st
@@ -78,6 +78,12 @@ if "Kategori" not in df_barang.columns:
 df_barang.to_csv(DB_BARANG, index=False)
 
 df_transaksi = pd.read_csv(DB_TRANSAKSI)
+
+
+# Fungsi Waktu WIB (GMT+7)
+def get_waktu_wib():
+  tz_wib = timezone(timedelta(hours=7))
+  return datetime.now(tz_wib).strftime("%Y-%m-%d %H:%M")
 
 
 # Fungsi untuk memberikan warna latar belakang baris tabel berdasarkan pilihan manual
@@ -260,7 +266,6 @@ elif menu == "✏️ Edit Data Barang":
           "Kategori", value=str(data_lama["Kategori"])
       )
 
-      # Checkbox Tanggal Produksi & Expire
       ada_tgl_prod = st.checkbox(
           "Ada Tanggal Produksi?",
           value=(True if data_lama["Tgl Produksi"] != "-" else False),
@@ -453,17 +458,14 @@ elif menu == "📥 Barang Masuk":
 
       if submit:
         kode_barang = kode_pilih.split(" - ")[0]
-        nama_barang = df_barang.loc[
-            df_barang["Kode Barang"] == kode_barang, "Nama Barang"
-        ].values[0]
+        idx = df_barang[df_barang["Kode Barang"] == kode_barang].index[0]
+        nama_barang = df_barang.loc[idx, "Nama Barang"]
 
-        df_barang.loc[df_barang["Kode Barang"] == kode_barang, "Stok Sistem"] += (
-            jumlah_masuk
-        )
+        df_barang.loc[idx, "Stok Sistem"] += jumlah_masuk
         df_barang.to_csv(DB_BARANG, index=False)
 
         new_trx = pd.DataFrame([{
-            "Tanggal": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "Tanggal": get_waktu_wib(),
             "Kode Barang": kode_barang,
             "Nama Barang": nama_barang,
             "Tipe": "MASUK",
@@ -503,25 +505,20 @@ elif menu == "📤 Barang Keluar":
 
       if submit:
         kode_barang = kode_pilih.split(" - ")[0]
-        stok_sekarang = df_barang.loc[
-            df_barang["Kode Barang"] == kode_barang, "Stok Sistem"
-        ].values[0]
-        nama_barang = df_barang.loc[
-            df_barang["Kode Barang"] == kode_barang, "Nama Barang"
-        ].values[0]
+        idx = df_barang[df_barang["Kode Barang"] == kode_barang].index[0]
+        stok_sekarang = int(df_barang.loc[idx, "Stok Sistem"])
+        nama_barang = df_barang.loc[idx, "Nama Barang"]
 
         if jumlah_keluar > stok_sekarang:
           st.error(
               f"Stok tidak mencukupi! Stok saat ini: {stok_sekarang} unit."
           )
         else:
-          df_barang.loc[
-              df_barang["Kode Barang"] == kode_barang, "Stok Sistem"
-          ] -= jumlah_keluar
+          df_barang.loc[idx, "Stok Sistem"] -= jumlah_keluar
           df_barang.to_csv(DB_BARANG, index=False)
 
           new_trx = pd.DataFrame([{
-              "Tanggal": datetime.now().strftime("%Y-%m-%d %H:%M"),
+              "Tanggal": get_waktu_wib(),
               "Kode Barang": kode_barang,
               "Nama Barang": nama_barang,
               "Tipe": "KELUAR",
@@ -621,7 +618,6 @@ elif menu == "➕ Tambah Barang Baru":
     batch_baru = st.text_input("Lot / Batch No (Contoh: 3924497)")
     kategori = st.text_input("Kategori Barang (Contoh: Chemical)")
 
-    # Checkbox untuk opsi ada/tidaknya tanggal produksi dan expire
     ada_tgl_prod_baru = st.checkbox(
         "Ada Tanggal Produksi? (Centang jika ada, kosongkan jika tidak ada)",
         value=True,
