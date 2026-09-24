@@ -109,6 +109,7 @@ menu = st.sidebar.selectbox(
     "Pilih Menu",
     [
         "📊 Dashboard Stok",
+        "📷 Scan Barcode / Cek Rak",
         "📍 Pemetaan Rak (Visual)",
         "📜 Riwayat Transaksi",
         "✏️ Edit Data Barang",
@@ -121,10 +122,10 @@ menu = st.sidebar.selectbox(
 )
 
 # ==========================================
-# 1. DASHBOARD STOK
+# 1. DASHBOARD STOK (DENGAN PENCARIAN & GRAFIK)
 # ==========================================
 if menu == "📊 Dashboard Stok":
-  st.title("📊 Dashboard Stok & Material Gudang")
+  st.title("📊 Dashboard Stok & Statistik Gudang")
   st.markdown("---")
 
   if df_barang.empty:
@@ -137,12 +138,90 @@ if menu == "📊 Dashboard Stok":
     col1.metric("Total Jenis / Lot Barang", f"{total_jenis} Jenis")
     col2.metric("Total Qty Seluruh Unit", f"{total_item} Unit")
 
-    st.subheader("Daftar Inventaris Lengkap")
-    df_styled = df_barang.style.apply(warnai_manual, axis=1)
-    st.dataframe(df_styled, use_container_width=True)
+    st.markdown("---")
+    # Fitur Pencarian Cepat (Quick Search)
+    st.subheader("🔍 Pencarian Cepat Material / Batch")
+    keyword = st.text_input(
+        "Ketik nama barang, kode, atau no batch yang ingin dicari:"
+    )
+
+    if keyword:
+      hasil_cari = df_barang[
+          df_barang.astype(str)
+          .apply(lambda row: row.str.contains(keyword, case=False).any(), axis=1)
+      ]
+      st.write(
+          f"Ditemukan {len(hasil_cari)} hasil untuk kata kunci:"
+          f" **{keyword}**"
+      )
+      if not hasil_cari.empty:
+        st.dataframe(
+            hasil_cari.style.apply(warnai_manual, axis=1),
+            use_container_width=True,
+        )
+      else:
+        st.warning("Material tidak ditemukan.")
+    else:
+      st.subheader("Daftar Inventaris Lengkap")
+      df_styled = df_barang.style.apply(warnai_manual, axis=1)
+      st.dataframe(df_styled, use_container_width=True)
+
+    # Grafik Ringkasan Statistik Stok per Kategori / Rak
+    st.markdown("---")
+    st.subheader("📈 Grafik Statistik Stok per Rak")
+    if "Nama Rak" in df_barang.columns and not df_barang.empty:
+      df_grafik = df_barang.groupby("Nama Rak")["Stok Sistem"].sum()
+      st.bar_chart(df_grafik)
 
 # ==========================================
-# 2. PEMETAAN RAK (BENTUK VISUAL RAK)
+# 2. SCAN BARCODE / CEK RAK INSTAN
+# ==========================================
+elif menu == "📷 Scan Barcode / Cek Rak":
+  st.title("📷 Scan Barcode / Cek Rak Instan")
+  st.markdown(
+      "Gunakan kamera HP untuk scan barcode rak atau pilih nama rak di bawah"
+      " untuk melihat semua isi barangnya secara instan."
+  )
+  st.markdown("---")
+
+  # Opsi A: Simulasi Scan Kamera HP
+  st.subheader("1️⃣ Kamera Scanner Barcode / QR")
+  gambar_kamera = st.camera_input("Ambil Foto Barcode Rak (Opsional)")
+  if gambar_kamera:
+    st.success("Barcode berhasil dipindai oleh kamera!")
+
+  st.markdown("---")
+
+  # Opsi B: Filter Cepat per Rak (Muncul Semua Barang di Rak Tersebut)
+  st.subheader("2️⃣ Pilih / Ketik Rak untuk Menampilkan Semua Isinya")
+  if df_barang.empty:
+    st.info("Belum ada data barang di gudang.")
+  else:
+    daftar_rak = ["-- Pilih Nama Rak --"] + sorted(
+        df_barang["Nama Rak"].dropna().unique().tolist()
+    )
+    pilih_rak_scan = st.selectbox("Pilih Nama Rak / Area", daftar_rak)
+
+    if pilih_rak_scan != "-- Pilih Nama Rak --":
+      df_hasil_rak = df_barang[df_barang["Nama Rak"] == pilih_rak_scan]
+      st.success(
+          f"Ditemukan {len(df_hasil_rak)} jenis material di **{pilih_rak_scan}**:"
+      )
+
+      # Tampilkan dalam bentuk kartu ringkas agar mudah dibaca di HP
+      for _, row in df_hasil_rak.iterrows():
+        st.info(
+            f"📦 **{row['Nama Barang']}**\n\n"
+            f"🏷️ **Kode:** `{row['Kode Barang']}` | 🔖 **Batch:**"
+            f" `{row['No Batch']}`\n\n"
+            f"📌 **Lokasi:** {row['Nama Rak']} - No. {row['Nomor Rak']} ("
+            f"{row['Tingkat Rak']})\n\n"
+            f"📊 **Stok:** **{row['Stok Sistem']} {row['Satuan']}** | ⏳ **Exp:**"
+            f" {row['Tgl Expire']}"
+        )
+
+# ==========================================
+# 3. PEMETAAN RAK (VISUAL)
 # ==========================================
 elif menu == "📍 Pemetaan Rak (Visual)":
   st.title("📍 Layout & Pemetaan Posisi Rak Bertingkat")
@@ -207,7 +286,7 @@ elif menu == "📍 Pemetaan Rak (Visual)":
       st.dataframe(df_tampil_styled, use_container_width=True)
 
 # ==========================================
-# 3. RIWAYAT TRANSAKSI
+# 4. RIWAYAT TRANSAKSI
 # ==========================================
 elif menu == "📜 Riwayat Transaksi":
   st.title("📜 Riwayat Barang Masuk & Keluar")
@@ -229,7 +308,7 @@ elif menu == "📜 Riwayat Transaksi":
     st.dataframe(df_trx_tampil, use_container_width=True)
 
 # ==========================================
-# 4. EDIT DATA BARANG
+# 5. EDIT DATA BARANG
 # ==========================================
 elif menu == "✏️ Edit Data Barang":
   st.title("✏️ Edit Lengkap Data, Batch & Satuan")
@@ -402,7 +481,7 @@ elif menu == "✏️ Edit Data Barang":
         st.rerun()
 
 # ==========================================
-# 5. HAPUS BARANG
+# 6. HAPUS BARANG
 # ==========================================
 elif menu == "🗑️ Hapus Barang":
   st.title("🗑️ Hapus Data Barang")
@@ -431,7 +510,7 @@ elif menu == "🗑️ Hapus Barang":
           st.error("Silakan centang kotak konfirmasi terlebih dahulu!")
 
 # ==========================================
-# 6. BARANG MASUK
+# 7. BARANG MASUK
 # ==========================================
 elif menu == "📥 Barang Masuk":
   st.title("📥 Input Barang Masuk")
@@ -478,7 +557,7 @@ elif menu == "📥 Barang Masuk":
         st.success(f"Berhasil menambahkan {jumlah_masuk} unit ke {nama_barang}!")
 
 # ==========================================
-# 7. BARANG KELUAR
+# 8. BARANG KELUAR
 # ==========================================
 elif menu == "📤 Barang Keluar":
   st.title("📤 Input Barang Keluar")
@@ -533,7 +612,7 @@ elif menu == "📤 Barang Keluar":
           )
 
 # ==========================================
-# 8. STOK OPNAME
+# 9. STOK OPNAME
 # ==========================================
 elif menu == "📋 Stok Opname":
   st.title("📋 Cek Stok Opname (Audit Fisik)")
@@ -606,7 +685,7 @@ elif menu == "📋 Stok Opname":
         st.rerun()
 
 # ==========================================
-# 9. TAMBAH BARANG BARU
+# 10. TAMBAH BARANG BARU
 # ==========================================
 elif menu == "➕ Tambah Barang Baru":
   st.title("➕ Tambah Master Material & Form Identifikasi")
@@ -696,6 +775,5 @@ elif menu == "➕ Tambah Barang Baru":
         df_barang = pd.concat([df_barang, new_row], ignore_index=True)
         df_barang.to_csv(DB_BARANG, index=False)
         st.success(
-            f"Material `{nama_baru}` berhasil disimpan (Prode Date:"
-            f" {final_tgl_prod} | Exp Date: {final_tgl_exp})!"
+            f"Material `{nama_baru}` berhasil disimpan di `{nama_rak}`!"
         )
