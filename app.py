@@ -75,9 +75,6 @@ if "Tingkat Rak" not in df_barang.columns:
   df_barang["Tingkat Rak"] = "Level 1 (Bawah)"
 if "Kategori" not in df_barang.columns:
   df_barang["Kategori"] = "-"
-# Hapus kolom harga jika masih ada dari versi sebelumnya
-if "Harga Satuan" in df_barang.columns:
-  df_barang = df_barang.drop(columns=["Harga Satuan"])
 df_barang.to_csv(DB_BARANG, index=False)
 
 df_transaksi = pd.read_csv(DB_TRANSAKSI)
@@ -106,7 +103,7 @@ menu = st.sidebar.selectbox(
     "Pilih Menu",
     [
         "📊 Dashboard Stok",
-        "📍 Pemetaan Rak",
+        "📍 Pemetaan Rak (Visual)",
         "📜 Riwayat Transaksi",
         "✏️ Edit Data Barang",
         "🗑️ Hapus Barang",
@@ -128,64 +125,94 @@ if menu == "📊 Dashboard Stok":
     st.info("Belum ada data barang. Silakan tambah barang baru melalui menu.")
   else:
     total_jenis = len(df_barang)
+    total_item = df_barang["Stok Sistem"].sum()
 
     col1, col2 = st.columns(2)
     col1.metric("Total Jenis / Lot Barang", f"{total_jenis} Jenis")
-    col2.markdown(
-        "💡 *Satuan & Batch tercatat langsung di tabel inventaris.*"
-    )
+    col2.metric("Total Qty Seluruh Unit", f"{total_item} Unit")
 
     st.subheader("Daftar Inventaris Lengkap")
     df_styled = df_barang.style.apply(warnai_manual, axis=1)
     st.dataframe(df_styled, use_container_width=True)
 
 # ==========================================
-# 2. PEMETAAN RAK
+# 2. PEMETAAN RAK (BENTUK VISUAL RAK)
 # ==========================================
-elif menu == "📍 Pemetaan Rak":
-  st.title("📍 Denah & Pemetaan Posisi Rak Barang")
-  st.markdown("Cek posisi letak barang berdasarkan Nama Rak, Nomor, dan Tingkatnya.")
+elif menu == "📍 Pemetaan Rak (Visual)":
+  st.title("📍 Layout & Pemetaan Posisi Rak Bertingkat")
+  st.markdown(
+      "Visualisasi penempatan material berdasarkan Nama Rak, Nomor Kolom, dan"
+      " Tingkat Rak."
+  )
   st.markdown("---")
 
   if df_barang.empty:
     st.info("Belum ada data barang.")
   else:
-    daftar_nama_rak = ["Semua Nama Rak"] + sorted(
-        df_barang["Nama Rak"].dropna().unique().tolist()
+    daftar_nama_rak = sorted(df_barang["Nama Rak"].dropna().unique().tolist())
+    pilih_nama_rak = st.selectbox(
+        "🏢 Pilih Nama Rak / Area Gudang", daftar_nama_rak
     )
-    pilih_nama_rak = st.selectbox("Filter Berdasarkan Nama Rak", daftar_nama_rak)
 
-    if pilih_nama_rak == "Semua Nama Rak":
-      df_tampil = df_barang
+    st.markdown(f"### 📦 Visualisasi Rak: **{pilih_nama_rak}**")
+    df_rak = df_barang[df_barang["Nama Rak"] == pilih_nama_rak]
+
+    if df_rak.empty:
+      st.warning(f"Belum ada material di {pilih_nama_rak}.")
     else:
-      df_tampil = df_barang[df_barang["Nama Rak"] == pilih_nama_rak]
+      # Urutkan berdasarkan tingkat dari atas ke bawah atau sebaliknya
+      tingkat_list = [
+          "Level 4 (Atas)",
+          "Level 3",
+          "Level 2",
+          "Level 1 (Bawah)",
+      ]
 
-    st.subheader(f"Daftar Barang di {pilih_nama_rak}")
-    df_tampil_styled = df_tampil[[
-        "Kode Barang",
-        "Nama Barang",
-        "No Batch",
-        "Nama Rak",
-        "Nomor Rak",
-        "Tingkat Rak",
-        "Stok Sistem",
-        "Satuan",
-    ]].style.apply(warnai_manual, axis=1)
-    st.dataframe(df_tampil_styled, use_container_width=True)
+      for lvl in tingkat_list:
+        df_lvl = df_rak[df_rak["Tingkat Rak"] == lvl]
+        if not df_lvl.empty:
+          with st.container():
+            st.markdown(
+                f"**🪜 {lvl}** *(Struktur Rak Besi Bertingkat)*"
+            )
+            cols = st.columns(
+                min(len(df_lvl), 3)
+            )  # Buat kotak grid per kolom rak
+            for i, (_, row) in enumerate(df_lvl.iterrows()):
+              with cols[i % len(cols)]:
+                st.info(
+                    f"**{row['Nama Barang']}**\n\n"
+                    f"🏷️ **Kode:** `{row['Kode Barang']}`\n\n"
+                    f"🔖 **Batch:** {row['No Batch']}\n\n"
+                    f"📌 **Blok/Kolom:** {row['Nomor Rak']}\n\n"
+                    f"📦 **Stok:** {row['Stok Sistem']} {row['Satuan']}\n\n"
+                    f"⏳ **Exp:** {row['Tgl Expire']}"
+                )
+            st.markdown("---")
+
+      st.subheader(f"📋 Tabel Detail Rak {pilih_nama_rak}")
+      df_tampil_styled = df_rak[[
+          "Kode Barang",
+          "Nama Barang",
+          "No Batch",
+          "Nomor Rak",
+          "Tingkat Rak",
+          "Stok Sistem",
+          "Satuan",
+          "Tgl Expire",
+      ]].style.apply(warnai_manual, axis=1)
+      st.dataframe(df_tampil_styled, use_container_width=True)
 
 # ==========================================
 # 3. RIWAYAT TRANSAKSI
 # ==========================================
 elif menu == "📜 Riwayat Transaksi":
   st.title("📜 Riwayat Barang Masuk & Keluar")
-  st.markdown(
-      "Catatan seluruh aktivitas keluar masuk material beserta tanggal dan"
-      " jamnya."
-  )
+  st.markdown("Catatan aktivitas keluar masuk material beserta tanggal dan jamnya.")
   st.markdown("---")
 
   if df_transaksi.empty:
-    st.info("Belum ada riwayat transaksi barang masuk atau keluar.")
+    st.info("Belum ada riwayat transaksi.")
   else:
     filter_tipe = st.selectbox(
         "Filter Tipe Transaksi", ["Semua", "MASUK", "KELUAR"]
@@ -203,10 +230,7 @@ elif menu == "📜 Riwayat Transaksi":
 # ==========================================
 elif menu == "✏️ Edit Data Barang":
   st.title("✏️ Edit Lengkap Data, Batch & Satuan")
-  st.markdown(
-      "Pilih barang yang ingin diubah, lalu perbarui informasi datanya di"
-      " bawah."
-  )
+  st.markdown("Perbarui informasi material di gudang.")
   st.markdown("---")
 
   if df_barang.empty:
@@ -305,7 +329,12 @@ elif menu == "✏️ Edit Data Barang":
             "Nomor Rak / Kolom", value=str(data_lama["Nomor Rak"])
         )
       with col_r2:
-        tingkat_opsi = ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"]
+        tingkat_opsi = [
+            "Level 1 (Bawah)",
+            "Level 2",
+            "Level 3",
+            "Level 4 (Atas)",
+        ]
         default_idx = 0
         if data_lama["Tingkat Rak"] in tingkat_opsi:
           default_idx = tingkat_opsi.index(data_lama["Tingkat Rak"])
@@ -645,5 +674,5 @@ elif menu == "➕ Tambah Barang Baru":
         df_barang.to_csv(DB_BARANG, index=False)
         st.success(
             f"Material `{nama_baru}` (Batch: `{batch_baru}`) berhasil disimpan"
-            f" dengan satuan {satuan_pilih}!"
+            f" di {nama_rak}!"
         )
