@@ -149,32 +149,56 @@ def get_waktu_wib():
   return datetime.now(tz_wib).strftime("%Y-%m-%d %H:%M")
 
 
+# Fungsi untuk memberikan warna latar belakang baris tabel yang aman
+def warnai_manual(row):
+  warna = str(row.get("Warna Label", ""))
+  if "Biru" in warna:
+    return ["background-color: #d1ecf1"] * len(row)
+  elif "Hijau" in warna:
+    return ["background-color: #d4edda"] * len(row)
+  elif "Kuning" in warna:
+    return ["background-color: #fff3cd"] * len(row)
+  elif "Merah" in warna or "Pink" in warna:
+    return ["background-color: #f8d7da"] * len(row)
+  elif "Ungu" in warna:
+    return ["background-color: #e2d9f3"] * len(row)
+  else:
+    return [""] * len(row)
+
+
 # Judul Utama
 st.title("📦 Aplikasi Manajemen Gudang")
 
-# Menu Tab
-menu = st.tabs([
-    "📊 Dashboard",
-    "📷 Scan/Cek",
-    "📍 Pemetaan",
-    "📥 Masuk",
-    "📤 Keluar",
-    "📜 Riwayat",
-    "✏️ Edit",
-    "🗑️ Hapus",
-    "📋 Opname",
-    "➕ Tambah",
-])
+# Navigasi Menu di Samping (Sidebar) agar Nyaman
+st.sidebar.title("📌 Menu Navigasi")
+menu = st.sidebar.radio(
+    "Pilih Menu",
+    [
+        "📊 Dashboard",
+        "📷 Scan/Cek Rak",
+        "📍 Pemetaan",
+        "📥 Barang Masuk",
+        "📤 Barang Keluar",
+        "📜 Riwayat Transaksi",
+        "✏️ Edit Data",
+        "🗑️ Hapus Barang",
+        "📋 Stok Opname",
+        "➕ Tambah Master Baru",
+    ],
+)
 
 # ==========================================
 # 1. DASHBOARD STOK
 # ==========================================
-with menu[0]:
+if menu == "📊 Dashboard":
   st.subheader("📊 Dashboard Stok & Ringkasan Material")
   st.markdown("---")
 
   if df_barang.empty:
-    st.info("Belum ada data barang. Silakan tambah barang baru melalui menu ➕.")
+    st.info(
+        "Belum ada data barang. Silakan tambah barang baru melalui menu Tambah"
+        " Master Baru di samping."
+    )
   else:
     total_jenis = len(df_barang)
     total_item = df_barang["Stok Sistem"].sum()
@@ -211,7 +235,13 @@ with menu[0]:
           "Tgl Kedatangan",
           "Warna Label",
       ]
-      st.dataframe(df_sumber[kolom_ringkas], use_container_width=True)
+      try:
+        df_ringkas_styled = df_sumber[kolom_ringkas].style.apply(
+            warnai_manual, axis=1
+        )
+        st.dataframe(df_ringkas_styled, use_container_width=True)
+      except:
+        st.dataframe(df_sumber[kolom_ringkas], use_container_width=True)
 
       st.markdown("---")
       with st.expander("🔎 Klik di sini untuk Melihat Detail Lengkap Material"):
@@ -260,7 +290,7 @@ with menu[0]:
 # ==========================================
 # 2. SCAN BARCODE / CEK RAK
 # ==========================================
-with menu[1]:
+elif menu == "📷 Scan/Cek Rak":
   st.subheader("📷 Scan Barcode / Cek Rak Instan")
   st.markdown("---")
   gambar_kamera = st.camera_input("Ambil Foto Barcode Rak")
@@ -294,7 +324,7 @@ with menu[1]:
 # ==========================================
 # 3. PEMETAAN RAK (VISUAL)
 # ==========================================
-with menu[2]:
+elif menu == "📍 Pemetaan":
   st.subheader("📍 Layout & Pemetaan Posisi Rak Bertingkat")
   st.markdown("---")
 
@@ -343,12 +373,12 @@ with menu[2]:
 # ==========================================
 # 4. BARANG MASUK
 # ==========================================
-with menu[3]:
+elif menu == "📥 Barang Masuk":
   st.subheader("📥 Input Barang Masuk (Palet / Kedatangan Baru)")
   st.markdown("---")
 
   if df_barang.empty:
-    st.warning("Belum ada master barang. Silakan tambah di menu ➕.")
+    st.warning("Belum ada master barang. Silakan tambah di menu Tambah Baru.")
   else:
     daftar_nama_master = sorted(
         df_barang["Nama Barang"].dropna().unique().tolist()
@@ -509,7 +539,7 @@ with menu[3]:
 
           st.session_state["pesan_sukses"] = (
               f"✅ Barang Masuk `{nama_baru}` (Qty: {stok_awal} {satuan_pilih})"
-              " berhasil disimpan!"
+              " berhasil disimpan secara permanen!"
           )
           st.rerun()
 
@@ -520,7 +550,7 @@ with menu[3]:
 # ==========================================
 # 5. BARANG KELUAR
 # ==========================================
-with menu[4]:
+elif menu == "📤 Barang Keluar":
   st.subheader("📤 Input Barang Keluar")
   st.markdown("---")
 
@@ -599,7 +629,7 @@ with menu[4]:
 # ==========================================
 # 6. RIWAYAT TRANSAKSI
 # ==========================================
-with menu[5]:
+elif menu == "📜 Riwayat Transaksi":
   st.subheader("📜 Riwayat Barang Masuk & Keluar")
   st.markdown("---")
 
@@ -625,7 +655,7 @@ with menu[5]:
 # ==========================================
 # 7. EDIT DATA BARANG
 # ==========================================
-with menu[6]:
+elif menu == "✏️ Edit Data Barang":
   st.subheader("✏️ Edit Data Barang & Lokasi")
   st.markdown("---")
 
@@ -824,7 +854,7 @@ with menu[6]:
 # ==========================================
 # 8. HAPUS BARANG
 # ==========================================
-with menu[7]:
+elif menu == "🗑️ Hapus Barang":
   st.subheader("🗑️ Hapus Data Barang")
   st.markdown("---")
 
@@ -869,7 +899,7 @@ with menu[7]:
 # ==========================================
 # 9. STOK OPNAME
 # ==========================================
-with menu[8]:
+elif menu == "📋 Stok Opname":
   st.subheader("📋 Cek Stok Opname (Audit Fisik)")
   st.markdown("---")
 
@@ -948,7 +978,7 @@ with menu[8]:
 # ==========================================
 # 10. TAMBAH BARANG BARU (MASTER)
 # ==========================================
-with menu[9]:
+elif menu == "➕ Tambah Master Baru":
   st.subheader("➕ Tambah Master Material Baru")
   st.markdown("---")
 
