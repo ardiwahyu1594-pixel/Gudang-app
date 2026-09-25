@@ -170,7 +170,6 @@ with menu[0]:
       st.dataframe(df_ringkas_styled, use_container_width=True)
 
       st.markdown("---")
-      # Menggunakan Expander agar detail tertutup rapi dan hanya muncul saat diklik
       with st.expander("🔎 Klik di sini untuk Melihat Detail Lengkap Material"):
         pilih_detail = st.selectbox(
             "Pilih Material / Palet",
@@ -203,7 +202,8 @@ with menu[0]:
     st.markdown("### 📈 Grafik Statistik Stok per Rak")
     if "Nama Rak" in df_barang.columns and not df_barang.empty:
       df_grafik = df_barang.groupby("Nama Rak")["Stok Sistem"].sum()
-      st.bar_chart(df_grafik)
+      # Menggunakan use_container_width dan membersihkan tampilan grafik
+      st.bar_chart(df_grafik, use_container_width=True)
 
 # ==========================================
 # 2. SCAN BARCODE / CEK RAK
@@ -291,143 +291,184 @@ with menu[2]:
                     f"🏷️ **Kode/Lot:** `{row['Kode Barang']}`\n\n"
                     f"🔖 **Batch:** {row['No Batch']}\n\n"
                     f"📌 **Blok/Kolom:** {row['Nomor Rak']}\n\n"
-                    f"📦 **Stok:** {row['Stok Sistem']} {row['Satuan']}\n\n"
+                    f"📦 **Stok:** {row['Stok Sistem']} {row['Satuan']}**\n\n"
                     f"📥 **Datang:** {row['Tgl Kedatangan']}\n\n"
                     f"⏳ **Exp:** {row['Tgl Expire']}"
                 )
             st.markdown("---")
 
 # ==========================================
-# 4. BARANG MASUK
+# 4. BARANG MASUK (DENGAN NAMA BARANG OTOMATIS)
 # ==========================================
 with menu[3]:
   st.subheader("📥 Input Barang Masuk (Palet / Kedatangan Baru)")
   st.markdown(
-      "Catat kedatangan material baru lengkap dengan tanggal masuk, batch,"
-      " dan tanggal kedaluwarsa."
+      "Pilih nama material yang sudah ada agar terisi otomatis, atau ketik"
+      " baru."
   )
   st.markdown("---")
 
-  with st.form("form_barang_masuk_lengkap"):
-    kode_baru = st.text_input(
-        "Kode / No Lot Palet Baru (Contoh: PM-00003-4)"
-    )
-    nama_baru = st.text_input(
-        "Nama Material (Contoh: Carton klatu Premium @65 mL)"
-    )
-    batch_baru = st.text_input("Lot / Batch No (Opsional)")
-    kategori = st.text_input(
-        "Kategori Barang (Contoh: Packaging / Chemical)"
+  if df_barang.empty:
+    st.warning("Belum ada master barang. Silakan tambah di menu ➕.")
+  else:
+    # Ambil daftar nama barang unik yang sudah ada
+    daftar_nama_master = sorted(
+        df_barang["Nama Barang"].dropna().unique().tolist()
     )
 
-    ada_tgl_prod_masuk = st.checkbox(
-        "Ada Tanggal Produksi? (Centang jika ada, kosongkan jika tidak ada)",
-        value=True,
-        key="chk_prod_masuk",
-    )
-    ada_tgl_exp_masuk = st.checkbox(
-        "Ada Tanggal Expire? (Centang jika ada, kosongkan jika tidak ada)",
-        value=True,
-        key="chk_exp_masuk",
-    )
-
-    col_t1, col_t2, col_t3 = st.columns(3)
-    with col_t1:
-      tgl_datang = st.date_input("Incoming Date (Tanggal Kedatangan)")
-    with col_t2:
-      tgl_prod = st.date_input("Prode Date", value=date.today(), key="prod_masuk")
-    with col_t3:
-      tgl_exp = st.date_input("Exp. Date", value=date.today(), key="exp_masuk")
-
-    pilihan_warna = [
-        "Putih (Normal)",
-        "Biru Muda (Karton/Box)",
-        "Hijau Muda (Plastik)",
-        "Kuning Muda (Sheet/Kertas)",
-        "Merah/Pink (Aseptic)",
-        "Ungu Muda",
-    ]
-    warna_pilih = st.selectbox(
-        "Pilih Warna Label Baris", pilihan_warna, key="warna_masuk"
-    )
-
-    nama_rak = st.text_input(
-        "Nama Rak / Area (Contoh: Rak Packaging A)", key="rak_masuk"
-    )
-
-    col_r1, col_r2 = st.columns(2)
-    with col_r1:
-      nomor_rak = st.text_input(
-          "Nomor Rak / Kolom (Contoh: Rak 1)", key="norak_masuk"
-      )
-    with col_r2:
-      tingkat_rak = st.selectbox(
-          "Tingkat / Level Rak",
-          ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"],
-          key="tingkat_masuk",
+    with st.form("form_barang_masuk_lengkap"):
+      kode_baru = st.text_input(
+          "Kode / No Lot Palet Baru (Contoh: PM-00003-4)"
       )
 
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-      stok_awal = st.number_input(
-          "Qty (Jumlah Barang Masuk)", min_value=1, step=1, value=1
-      )
-    with col_s2:
-      satuan_pilih = st.selectbox(
-          "Satuan (Unit)",
-          ["Pcs", "Kg", "Zak", "Ltr", "Box", "Drum", "Pail", "Roll"],
-          key="satuan_masuk",
+      # Pilihan Mode: Pilih dari master yang ada atau ketik baru
+      tipe_input_nama = st.radio(
+          "Pilih Sumber Nama Material",
+          ["Pilih dari Barang yang Sudah Ada", "Ketik Nama Material Baru"],
+          horizontal=True,
       )
 
-    keterangan = st.text_input("Keterangan / Supplier", "Pembelian / Datang Baru")
-
-    submit_masuk = st.form_submit_button("Simpan Barang Masuk")
-
-    if submit_masuk:
-      if not kode_baru or not nama_baru:
-        st.error("Kode dan Nama Material wajib diisi!")
-      elif kode_baru in df_barang["Kode Barang"].values:
-        st.error("Kode/Lot palet tersebut sudah terdaftar di sistem!")
+      if tipe_input_nama == "Pilih dari Barang yang Sudah Ada":
+        nama_terpilih = st.selectbox(
+            "Pilih Nama Material", daftar_nama_master
+        )
+        nama_baru = nama_terpilih
+        # Ambil otomatis kategori dan satuan dari barang sebelumnya jika ada
+        contoh_row = df_barang[df_barang["Nama Barang"] == nama_terpilih].iloc[
+            0
+        ]
+        default_kategori = str(contoh_row["Kategori"])
+        default_satuan = str(contoh_row["Satuan"])
+        default_rak = str(contoh_row["Nama Rak"])
       else:
-        final_tgl_prod = (
-            tgl_prod.strftime("%Y-%m-%d") if ada_tgl_prod_masuk else "-"
+        nama_baru = st.text_input("Nama Material Baru")
+        default_kategori = "Packaging"
+        default_satuan = "Pcs"
+        default_rak = "Rak A"
+
+      batch_baru = st.text_input("Lot / Batch No (Opsional)")
+      kategori = st.text_input(
+          "Kategori Barang", value=default_kategori
+      )
+
+      ada_tgl_prod_masuk = st.checkbox(
+          "Ada Tanggal Produksi?", value=True, key="chk_prod_masuk"
+      )
+      ada_tgl_exp_masuk = st.checkbox(
+          "Ada Tanggal Expire?", value=True, key="chk_exp_masuk"
+      )
+
+      col_t1, col_t2, col_t3 = st.columns(3)
+      with col_t1:
+        tgl_datang = st.date_input("Incoming Date (Tanggal Kedatangan)")
+      with col_t2:
+        tgl_prod = st.date_input("Prode Date", value=date.today(), key="prod_masuk")
+      with col_t3:
+        tgl_exp = st.date_input("Exp. Date", value=date.today(), key="exp_masuk")
+
+      pilihan_warna = [
+          "Putih (Normal)",
+          "Biru Muda (Karton/Box)",
+          "Hijau Muda (Plastik)",
+          "Kuning Muda (Sheet/Kertas)",
+          "Merah/Pink (Aseptic)",
+          "Ungu Muda",
+      ]
+      warna_pilih = st.selectbox(
+          "Pilih Warna Label Baris", pilihan_warna, key="warna_masuk"
+      )
+
+      nama_rak = st.text_input(
+          "Nama Rak / Area", value=default_rak, key="rak_masuk"
+      )
+
+      col_r1, col_r2 = st.columns(2)
+      with col_r1:
+        nomor_rak = st.text_input(
+            "Nomor Rak / Kolom (Contoh: Rak 1)", key="norak_masuk"
         )
-        final_tgl_exp = (
-            tgl_exp.strftime("%Y-%m-%d") if ada_tgl_exp_masuk else "-"
+      with col_r2:
+        tingkat_rak = st.selectbox(
+            "Tingkat / Level Rak",
+            ["Level 1 (Bawah)", "Level 2", "Level 3", "Level 4 (Atas)"],
+            key="tingkat_masuk",
         )
 
-        new_row = pd.DataFrame([{
-            "Kode Barang": kode_baru,
-            "Nama Barang": nama_baru,
-            "No Batch": batch_baru if batch_baru else "-",
-            "Kategori": kategori if kategori else "-",
-            "Warna Label": warna_pilih,
-            "Tgl Kedatangan": tgl_datang.strftime("%Y-%m-%d"),
-            "Tgl Produksi": final_tgl_prod,
-            "Tgl Expire": final_tgl_exp,
-            "Nama Rak": nama_rak if nama_rak else "-",
-            "Nomor Rak": nomor_rak if nomor_rak else "-",
-            "Tingkat Rak": tingkat_rak,
-            "Stok Sistem": stok_awal,
-            "Satuan": satuan_pilih,
-        }])
-        df_barang = pd.concat([df_barang, new_row], ignore_index=True)
-        df_barang.to_csv(DB_BARANG, index=False)
-
-        new_trx = pd.DataFrame([{
-            "Tanggal": get_waktu_wib(),
-            "Kode Barang": kode_baru,
-            "Nama Barang": nama_baru,
-            "Tipe": "MASUK",
-            "Jumlah": stok_awal,
-            "Keterangan": keterangan,
-        }])
-        df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
-        df_transaksi.to_csv(DB_TRANSAKSI, index=False)
-
-        st.success(
-            f"Barang Masuk `{nama_baru}` (Tgl Kedatangan: {tgl_datang.strftime('%Y-%m-%d')} | Qty: {stok_awal} {satuan_pilih}) berhasil disimpan & tercatat di riwayat!"
+      col_s1, col_s2 = st.columns(2)
+      with col_s1:
+        stok_awal = st.number_input(
+            "Qty (Jumlah Barang Masuk)", min_value=1, step=1, value=1
         )
+      with col_s2:
+        satuan_opsi = [
+            "Pcs",
+            "Kg",
+            "Zak",
+            "Ltr",
+            "Box",
+            "Drum",
+            "Pail",
+            "Roll",
+        ]
+        idx_satuan = (
+            satuan_opsi.index(default_satuan)
+            if default_satuan in satuan_opsi
+            else 0
+        )
+        satuan_pilih = st.selectbox(
+            "Satuan (Unit)", satuan_opsi, index=idx_satuan, key="satuan_masuk"
+        )
+
+      keterangan = st.text_input("Keterangan / Supplier", "Datang Palet Baru")
+
+      submit_masuk = st.form_submit_button("Simpan Barang Masuk")
+
+      if submit_masuk:
+        if not kode_baru or not nama_baru:
+          st.error("Kode dan Nama Material wajib diisi!")
+        elif kode_baru in df_barang["Kode Barang"].values:
+          st.error("Kode/Lot palet tersebut sudah terdaftar di sistem!")
+        else:
+          final_tgl_prod = (
+              tgl_prod.strftime("%Y-%m-%d") if ada_tgl_prod_masuk else "-"
+          )
+          final_tgl_exp = (
+              tgl_exp.strftime("%Y-%m-%d") if ada_tgl_exp_masuk else "-"
+          )
+
+          new_row = pd.DataFrame([{
+              "Kode Barang": kode_baru,
+              "Nama Barang": nama_baru,
+              "No Batch": batch_baru if batch_baru else "-",
+              "Kategori": kategori if kategori else "-",
+              "Warna Label": warna_pilih,
+              "Tgl Kedatangan": tgl_datang.strftime("%Y-%m-%d"),
+              "Tgl Produksi": final_tgl_prod,
+              "Tgl Expire": final_tgl_exp,
+              "Nama Rak": nama_rak if nama_rak else "-",
+              "Nomor Rak": nomor_rak if nomor_rak else "-",
+              "Tingkat Rak": tingkat_rak,
+              "Stok Sistem": stok_awal,
+              "Satuan": satuan_pilih,
+          }])
+          df_barang = pd.concat([df_barang, new_row], ignore_index=True)
+          df_barang.to_csv(DB_BARANG, index=False)
+
+          new_trx = pd.DataFrame([{
+              "Tanggal": get_waktu_wib(),
+              "Kode Barang": kode_baru,
+              "Nama Barang": nama_baru,
+              "Tipe": "MASUK",
+              "Jumlah": stok_awal,
+              "Keterangan": keterangan,
+          }])
+          df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
+          df_transaksi.to_csv(DB_TRANSAKSI, index=False)
+
+          st.success(
+              f"Barang Masuk `{nama_baru}` (Palet: {kode_baru} | Qty:"
+              f" {stok_awal} {satuan_pilih}) berhasil disimpan!"
+          )
 
 # ==========================================
 # 5. BARANG KELUAR
