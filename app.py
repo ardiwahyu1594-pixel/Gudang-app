@@ -231,9 +231,10 @@ with menu[0]:
           "Nama Rak",
           "Nomor Rak",
           "Tgl Kedatangan",
+          "Warna Label",
       ]
-      df_ringkas_styled = df_sumber[kolom_ringkas].style.apply(
-          warnai_manual, axis=1
+      df_ringkas_styled = (
+          df_sumber[kolom_ringkas].style.apply(warnai_manual, axis=1)
       )
       st.dataframe(df_ringkas_styled, use_container_width=True)
 
@@ -276,10 +277,21 @@ with menu[0]:
       st.warning("Material tidak ditemukan.")
 
     st.markdown("---")
-    st.markdown("### 📈 Grafik Statistik Stok per Rak")
+    st.markdown("### 🔵 Grafik Statistik Stok per Rak (Pie Chart)")
     if "Nama Rak" in df_barang.columns and not df_barang.empty:
       df_grafik = df_barang.groupby("Nama Rak")["Stok Sistem"].sum()
-      st.bar_chart(df_grafik, use_container_width=True)
+      import matplotlib.pyplot as plt
+
+      fig, ax = plt.subplots(figsize=(6, 6))
+      ax.pie(
+          df_grafik,
+          labels=df_grafik.index,
+          autopct="%1.1f%%",
+          startangle=90,
+          colors=plt.cm.Paired.colors,
+      )
+      ax.axis("equal")
+      st.pyplot(fig)
 
 # ==========================================
 # 2. SCAN BARCODE / CEK RAK
@@ -378,9 +390,6 @@ with menu[2]:
 # ==========================================
 with menu[3]:
   st.subheader("📥 Input Barang Masuk (Palet / Kedatangan Baru)")
-  st.markdown(
-      "Pilih langsung nama materialnya, sistem otomatis mencatat kedatangannya."
-  )
   st.markdown("---")
 
   if df_barang.empty:
@@ -533,7 +542,7 @@ with menu[3]:
               (
                   get_waktu_wib(),
                   id_baru,
-                  kode_barang,
+                  kode_baru,
                   nama_baru,
                   "MASUK",
                   stok_awal,
@@ -543,11 +552,15 @@ with menu[3]:
           conn.commit()
           conn.close()
 
-          st.success(
-              f"Barang Masuk `{nama_baru}` (Qty: {stok_awal} {satuan_pilih})"
-              " berhasil disimpan secara permanen!"
+          st.session_state["pesan_sukses"] = (
+              f"✅ Barang Masuk `{nama_baru}` (Qty: {stok_awal} {satuan_pilih})"
+              " berhasil disimpan!"
           )
           st.rerun()
+
+  if "pesan_sukses" in st.session_state:
+    st.success(st.session_state["pesan_sukses"])
+    del st.session_state["pesan_sukses"]
 
 # ==========================================
 # 5. BARANG KELUAR
@@ -619,10 +632,14 @@ with menu[4]:
           conn.commit()
           conn.close()
 
-          st.success(
-              f"Berhasil mengeluarkan {jumlah_keluar} unit {nama_barang}!"
+          st.session_state["pesan_sukses"] = (
+              f"✅ Berhasil mengeluarkan {jumlah_keluar} unit {nama_barang}!"
           )
           st.rerun()
+
+  if "pesan_sukses" in st.session_state:
+    st.success(st.session_state["pesan_sukses"])
+    del st.session_state["pesan_sukses"]
 
 # ==========================================
 # 6. RIWAYAT TRANSAKSI
@@ -656,7 +673,6 @@ with menu[5]:
 # ==========================================
 with menu[6]:
   st.subheader("✏️ Edit Data Barang & Lokasi")
-  st.markdown("Perbarui informasi material di gudang.")
   st.markdown("---")
 
   if df_barang.empty:
@@ -842,15 +858,20 @@ with menu[6]:
         conn.commit()
         conn.close()
 
-        st.success(f"Data material `{nama_baru_input}` berhasil diperbarui!")
+        st.session_state["pesan_sukses"] = (
+            f"✅ Data material `{nama_baru_input}` berhasil diperbarui!"
+        )
         st.rerun()
+
+  if "pesan_sukses" in st.session_state:
+    st.success(st.session_state["pesan_sukses"])
+    del st.session_state["pesan_sukses"]
 
 # ==========================================
 # 8. HAPUS BARANG
 # ==========================================
 with menu[7]:
   st.subheader("🗑️ Hapus Data Barang")
-  st.markdown("Pilih barang yang ingin dihapus dari inventaris.")
   st.markdown("---")
 
   if df_barang.empty:
@@ -880,17 +901,22 @@ with menu[7]:
           conn.commit()
           conn.close()
 
-          st.success("Barang berhasil dihapus secara permanen!")
+          st.session_state["pesan_sukses"] = (
+              "✅ Barang berhasil dihapus secara permanen!"
+          )
           st.rerun()
         else:
           st.error("Silakan centang kotak konfirmasi terlebih dahulu!")
+
+  if "pesan_sukses" in st.session_state:
+    st.success(st.session_state["pesan_sukses"])
+    del st.session_state["pesan_sukses"]
 
 # ==========================================
 # 9. STOK OPNAME
 # ==========================================
 with menu[8]:
   st.subheader("📋 Cek Stok Opname (Audit Fisik)")
-  st.markdown("Bandingkan jumlah stok sistem dengan perhitungan fisik di rak.")
   st.markdown("---")
 
   if df_barang.empty:
@@ -946,11 +972,11 @@ with menu[8]:
       st.markdown("---")
       st.subheader("Hasil Laporan Stok Opname")
       kolom_tampil_opname = [
-          col for col in df_opname.columns if col != "ID Unik"
+          col for col in df_opname.columns if col not in ["ID Unik", "Warna Label"]
       ]
-      df_opname_styled = df_opname[kolom_tampil_opname].style.apply(
-          warnai_manual, axis=1
-      )
+      df_opname_styled = df_opname[
+          kolom_tampil_opname + ["Warna Label"]
+      ].style.apply(warnai_manual, axis=1)
       st.dataframe(df_opname_styled, use_container_width=True)
 
       if st.button("💾 Sinkronkan Stok Sistem dengan Fisik Aktual"):
@@ -964,10 +990,9 @@ with menu[8]:
         conn.commit()
         conn.close()
         st.success(
-            "Stok sistem berhasil disesuaikan dengan hasil opname fisik secara"
-            " permanen!"
+            "✅ Stok sistem berhasil disesuaikan dengan hasil opname fisik"
+            " secara permanen!"
         )
-        st.rerun()
 
 # ==========================================
 # 10. TAMBAH BARANG BARU (MASTER)
@@ -1079,7 +1104,11 @@ with menu[9]:
         conn.commit()
         conn.close()
 
-        st.success(
-            f"Master Material `{nama_baru}` berhasil disimpan secara permanen!"
+        st.session_state["pesan_sukses"] = (
+            f"✅ Master Material `{nama_baru}` berhasil disimpan secara permanen!"
         )
         st.rerun()
+
+  if "pesan_sukses" in st.session_state:
+    st.success(st.session_state["pesan_sukses"])
+    del st.session_state["pesan_sukses"]
