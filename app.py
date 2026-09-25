@@ -22,7 +22,6 @@ def init_db():
   conn = get_connection()
   cursor = conn.cursor()
 
-  # Tabel Barang / Palet
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS barang (
             id_unik TEXT PRIMARY KEY,
@@ -42,7 +41,6 @@ def init_db():
         )
     """)
 
-  # Tabel Riwayat Transaksi
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS transaksi (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +60,7 @@ def init_db():
 init_db()
 
 
-# Fungsi Load Data dari SQLite ke DataFrame Pandas
+# Fungsi Load Data
 def load_data_barang():
   conn = get_connection()
   df = pd.read_sql_query("SELECT * FROM barang", conn)
@@ -77,12 +75,10 @@ def load_data_transaksi():
   return df
 
 
-# Load Data ke Variabel Utama
 df_barang = load_data_barang()
 df_transaksi = load_data_transaksi()
 
-
-# Ubah nama kolom agar sesuai dengan kode di bawah
+# Penyesuaian Nama Kolom
 if not df_barang.empty:
   df_barang = df_barang.rename(
       columns={
@@ -148,36 +144,18 @@ else:
   )
 
 
-# Fungsi Waktu WIB (GMT+7)
 def get_waktu_wib():
   tz_wib = timezone(timedelta(hours=7))
   return datetime.now(tz_wib).strftime("%Y-%m-%d %H:%M")
 
 
-# Fungsi untuk memberikan warna latar belakang baris tabel berdasarkan pilihan manual
-def warnai_manual(row):
-  warna = str(row.get("Warna Label", ""))
-  if "Biru" in warna:
-    return ["background-color: #d1ecf1"] * len(row)
-  elif "Hijau" in warna:
-    return ["background-color: #d4edda"] * len(row)
-  elif "Kuning" in warna:
-    return ["background-color: #fff3cd"] * len(row)
-  elif "Merah" in warna or "Pink" in warna:
-    return ["background-color: #f8d7da"] * len(row)
-  elif "Ungu" in warna:
-    return ["background-color: #e2d9f3"] * len(row)
-  else:
-    return [""] * len(row)
-
-
-# Judul Utama Aplikasi di HP
+# Judul Utama
 st.title("📦 Aplikasi Manajemen Gudang")
 
-# Navigasi Model Tab Menu di Atas (Horizontal Tabs) yang Nyaman untuk HP
+# Menu Tab
 menu = st.tabs([
     "📊 Dashboard",
-    "📷 Scan/Cek Rak",
+    "📷 Scan/Cek",
     "📍 Pemetaan",
     "📥 Masuk",
     "📤 Keluar",
@@ -233,10 +211,7 @@ with menu[0]:
           "Tgl Kedatangan",
           "Warna Label",
       ]
-      df_ringkas_styled = (
-          df_sumber[kolom_ringkas].style.apply(warnai_manual, axis=1)
-      )
-      st.dataframe(df_ringkas_styled, use_container_width=True)
+      st.dataframe(df_sumber[kolom_ringkas], use_container_width=True)
 
       st.markdown("---")
       with st.expander("🔎 Klik di sini untuk Melihat Detail Lengkap Material"):
@@ -277,41 +252,22 @@ with menu[0]:
       st.warning("Material tidak ditemukan.")
 
     st.markdown("---")
-    st.markdown("### 🔵 Grafik Statistik Stok per Rak (Pie Chart)")
+    st.markdown("### 📈 Grafik Statistik Stok per Rak")
     if "Nama Rak" in df_barang.columns and not df_barang.empty:
       df_grafik = df_barang.groupby("Nama Rak")["Stok Sistem"].sum()
-      import matplotlib.pyplot as plt
-
-      fig, ax = plt.subplots(figsize=(6, 6))
-      ax.pie(
-          df_grafik,
-          labels=df_grafik.index,
-          autopct="%1.1f%%",
-          startangle=90,
-          colors=plt.cm.Paired.colors,
-      )
-      ax.axis("equal")
-      st.pyplot(fig)
+      st.bar_chart(df_grafik)
 
 # ==========================================
 # 2. SCAN BARCODE / CEK RAK
 # ==========================================
 with menu[1]:
   st.subheader("📷 Scan Barcode / Cek Rak Instan")
-  st.markdown(
-      "Gunakan kamera HP atau pilih nama rak untuk melihat seluruh isi palet"
-      " barang."
-  )
   st.markdown("---")
-
   gambar_kamera = st.camera_input("Ambil Foto Barcode Rak")
   if gambar_kamera:
     st.success("Barcode berhasil dipindai oleh kamera!")
 
-  st.markdown("---")
-  if df_barang.empty:
-    st.info("Belum ada data barang di gudang.")
-  else:
+  if not df_barang.empty:
     daftar_rak = ["-- Pilih Nama Rak --"] + sorted(
         df_barang["Nama Rak"].dropna().unique().tolist()
     )
@@ -340,7 +296,6 @@ with menu[1]:
 # ==========================================
 with menu[2]:
   st.subheader("📍 Layout & Pemetaan Posisi Rak Bertingkat")
-  st.markdown("Visualisasi penempatan material per rak.")
   st.markdown("---")
 
   if df_barang.empty:
@@ -543,7 +498,7 @@ with menu[3]:
                   get_waktu_wib(),
                   id_baru,
                   kode_baru,
-                  nama_baru,
+                  nama_barang,
                   "MASUK",
                   stok_awal,
                   keterangan,
@@ -646,7 +601,6 @@ with menu[4]:
 # ==========================================
 with menu[5]:
   st.subheader("📜 Riwayat Barang Masuk & Keluar")
-  st.markdown("Catatan aktivitas keluar masuk material tersimpan permanen.")
   st.markdown("---")
 
   if df_transaksi.empty:
@@ -972,12 +926,9 @@ with menu[8]:
       st.markdown("---")
       st.subheader("Hasil Laporan Stok Opname")
       kolom_tampil_opname = [
-          col for col in df_opname.columns if col not in ["ID Unik", "Warna Label"]
+          col for col in df_opname.columns if col not in ["ID Unik"]
       ]
-      df_opname_styled = df_opname[
-          kolom_tampil_opname + ["Warna Label"]
-      ].style.apply(warnai_manual, axis=1)
-      st.dataframe(df_opname_styled, use_container_width=True)
+      st.dataframe(df_opname[kolom_tampil_opname], use_container_width=True)
 
       if st.button("💾 Sinkronkan Stok Sistem dengan Fisik Aktual"):
         conn = get_connection()
