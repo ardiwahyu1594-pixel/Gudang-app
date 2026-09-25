@@ -1,5 +1,5 @@
 from datetime import datetime, date, timedelta, timezone
-import os
+import sqlite3
 import pandas as pd
 import streamlit as st
 
@@ -8,87 +8,144 @@ st.set_page_config(
     page_title="Aplikasi Manajemen Gudang", page_icon="📦", layout="wide"
 )
 
-# File Database Lokal (CSV)
-DB_BARANG = "data_barang.csv"
-DB_TRANSAKSI = "data_transaksi.csv"
+# Nama Database SQLite Permanen
+DB_FILE = "gudang_permanent.db"
 
 
-# Inisialisasi Data jika belum ada
+# Inisialisasi Database SQLite Permanen
+def get_connection():
+  conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+  return conn
+
+
 def init_db():
-  if not os.path.exists(DB_BARANG):
-    df_barang = pd.DataFrame(
-        columns=[
-            "ID Unik",
-            "Kode Barang",
-            "Nama Barang",
-            "No Batch",
-            "Kategori",
-            "Warna Label",
-            "Tgl Kedatangan",
-            "Tgl Produksi",
-            "Tgl Expire",
-            "Nama Rak",
-            "Nomor Rak",
-            "Tingkat Rak",
-            "Stok Sistem",
-            "Satuan",
-        ]
-    )
-    df_barang.to_csv(DB_BARANG, index=False)
+  conn = get_connection()
+  cursor = conn.cursor()
 
-  if not os.path.exists(DB_TRANSAKSI):
-    df_transaksi = pd.DataFrame(
-        columns=[
-            "Tanggal",
-            "ID Unik",
-            "Kode Barang",
-            "Nama Barang",
-            "Tipe",
-            "Jumlah",
-            "Keterangan",
-        ]
-    )
-    df_transaksi.to_csv(DB_TRANSAKSI, index=False)
+  # Tabel Barang / Palet
+  cursor.execute("""
+        CREATE TABLE IF NOT EXISTS barang (
+            id_unik TEXT PRIMARY KEY,
+            kode_barang TEXT,
+            nama_barang TEXT,
+            no_batch TEXT,
+            kategori TEXT,
+            warna_label TEXT,
+            tgl_kedatangan TEXT,
+            tgl_produksi TEXT,
+            tgl_expire TEXT,
+            nama_rak TEXT,
+            nomor_rak TEXT,
+            tingkat_rak TEXT,
+            stok_sistem INTEGER,
+            satuan TEXT
+        )
+    """)
+
+  # Tabel Riwayat Transaksi
+  cursor.execute("""
+        CREATE TABLE IF NOT EXISTS transaksi (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tanggal TEXT,
+            id_unik TEXT,
+            kode_barang TEXT,
+            nama_barang TEXT,
+            tipe TEXT,
+            jumlah INTEGER,
+            keterangan TEXT
+        )
+    """)
+  conn.commit()
+  conn.close()
 
 
 init_db()
 
-# Load Data
-df_barang = pd.read_csv(DB_BARANG)
 
-# Perbaikan otomatis jika kolom versi lama belum ada
-if "ID Unik" not in df_barang.columns:
-  df_barang.insert(
-      0,
-      "ID Unik",
-      [
-          f"ID-{i+1}-{datetime.now().strftime('%H%M%S')}"
-          for i in range(len(df_barang))
-      ],
+# Fungsi Load Data dari SQLite ke DataFrame Pandas
+def load_data_barang():
+  conn = get_connection()
+  df = pd.read_sql_query("SELECT * FROM barang", conn)
+  conn.close()
+  return df
+
+
+def load_data_transaksi():
+  conn = get_connection()
+  df = pd.read_sql_query("SELECT * FROM transaksi", conn)
+  conn.close()
+  return df
+
+
+# Load Data ke Variabel Utama
+df_barang = load_data_barang()
+df_transaksi = load_data_transaksi()
+
+
+# Ubah nama kolom agar sesuai dengan kode di bawah
+if not df_barang.empty:
+  df_barang = df_barang.rename(
+      columns={
+          "id_unik": "ID Unik",
+          "kode_barang": "Kode Barang",
+          "nama_barang": "Nama Barang",
+          "no_batch": "No Batch",
+          "kategori": "Kategori",
+          "warna_label": "Warna Label",
+          "tgl_kedatangan": "Tgl Kedatangan",
+          "tgl_produksi": "Tgl Produksi",
+          "tgl_expire": "Tgl Expire",
+          "nama_rak": "Nama Rak",
+          "nomor_rak": "Nomor Rak",
+          "tingkat_rak": "Tingkat Rak",
+          "stok_sistem": "Stok Sistem",
+          "satuan": "Satuan",
+      }
   )
-if "No Batch" not in df_barang.columns:
-  df_barang["No Batch"] = "-"
-if "Satuan" not in df_barang.columns:
-  df_barang["Satuan"] = "Pcs"
-if "Tgl Kedatangan" not in df_barang.columns:
-  df_barang["Tgl Kedatangan"] = "-"
-if "Tgl Produksi" not in df_barang.columns:
-  df_barang["Tgl Produksi"] = "-"
-if "Tgl Expire" not in df_barang.columns:
-  df_barang["Tgl Expire"] = "-"
-if "Warna Label" not in df_barang.columns:
-  df_barang["Warna Label"] = "Putih (Normal)"
-if "Nama Rak" not in df_barang.columns:
-  df_barang["Nama Rak"] = "-"
-if "Nomor Rak" not in df_barang.columns:
-  df_barang["Nomor Rak"] = "-"
-if "Tingkat Rak" not in df_barang.columns:
-  df_barang["Tingkat Rak"] = "Level 1 (Bawah)"
-if "Kategori" not in df_barang.columns:
-  df_barang["Kategori"] = "-"
-df_barang.to_csv(DB_BARANG, index=False)
+else:
+  df_barang = pd.DataFrame(
+      columns=[
+          "ID Unik",
+          "Kode Barang",
+          "Nama Barang",
+          "No Batch",
+          "Kategori",
+          "Warna Label",
+          "Tgl Kedatangan",
+          "Tgl Produksi",
+          "Tgl Expire",
+          "Nama Rak",
+          "Nomor Rak",
+          "Tingkat Rak",
+          "Stok Sistem",
+          "Satuan",
+      ]
+  )
 
-df_transaksi = pd.read_csv(DB_TRANSAKSI)
+if not df_transaksi.empty:
+  df_transaksi = df_transaksi.rename(
+      columns={
+          "tanggal": "Tanggal",
+          "id_unik": "ID Unik",
+          "kode_barang": "Kode Barang",
+          "nama_barang": "Nama Barang",
+          "tipe": "Tipe",
+          "jumlah": "Jumlah",
+          "keterangan": "Keterangan",
+      }
+  )
+else:
+  df_transaksi = pd.DataFrame(
+      columns=[
+          "Tanggal",
+          "ID Unik",
+          "Kode Barang",
+          "Nama Barang",
+          "Tipe",
+          "Jumlah",
+          "Keterangan",
+      ]
+  )
 
 
 # Fungsi Waktu WIB (GMT+7)
@@ -182,7 +239,7 @@ with menu[0]:
 
       st.markdown("---")
       with st.expander("🔎 Klik di sini untuk Melihat Detail Lengkap Material"):
-         opsi_detail = (
+        opsi_detail = (
             df_sumber["ID Unik"]
             + " | "
             + df_sumber["Kode Barang"]
@@ -192,11 +249,11 @@ with menu[0]:
             + df_sumber["Tgl Kedatangan"]
             + ")"
         )
-         pilih_detail = st.selectbox(
-            "Pilih Material / Palet", opsi_detail
+        pilih_detail = st.selectbox(
+            "Pilih Material / Palet", opsi_detail, key="pilih_detail_box"
         )
 
-         if pilih_detail:
+        if pilih_detail:
           id_pilih = pilih_detail.split(" | ")[0]
           row_detail = df_sumber[df_sumber["ID Unik"] == id_pilih].iloc[0]
 
@@ -317,11 +374,13 @@ with menu[2]:
             st.markdown("---")
 
 # ==========================================
-# 4. BARANG MASUK (KODE OTOMATIS TERSEMBUNYI)
+# 4. BARANG MASUK
 # ==========================================
 with menu[3]:
   st.subheader("📥 Input Barang Masuk (Palet / Kedatangan Baru)")
-  st.markdown("Pilih langsung nama materialnya, sistem akan menyesuaikan kodenya secara otomatis.")
+  st.markdown(
+      "Pilih langsung nama materialnya, sistem otomatis mencatat kedatangannya."
+  )
   st.markdown("---")
 
   if df_barang.empty:
@@ -332,8 +391,6 @@ with menu[3]:
     )
 
     with st.form("form_barang_masuk_lengkap"):
-      
-      # Pindah ke paling atas agar langsung dipilih
       tipe_input_nama = st.radio(
           "Pilih Sumber Nama Material",
           ["Pilih dari Barang yang Sudah Ada", "Ketik Nama Material Baru"],
@@ -345,27 +402,22 @@ with menu[3]:
             "Pilih Nama Material", daftar_nama_master
         )
         nama_baru = nama_terpilih
-        contoh_row = df_barang[df_barang["Nama Barang"] == nama_terpilih].iloc[0]
-        
-        # Ambil Kode Barang dari database tanpa perlu menampilkannya di form input
+        contoh_row = df_barang[df_barang["Nama Barang"] == nama_terpilih].iloc[
+            0
+        ]
         kode_baru = str(contoh_row["Kode Barang"])
-        
         default_kategori = str(contoh_row["Kategori"])
         default_satuan = str(contoh_row["Satuan"])
         default_rak = str(contoh_row["Nama Rak"])
       else:
-        # Jika barang benar-benar baru, barulah munculkan kolom Kode Barang dan Nama Material
         nama_baru = st.text_input("Nama Material Baru (Ketik manual)")
         kode_baru = st.text_input("Kode Barang Baru (Wajib Diisi)")
-        
         default_kategori = "Packaging"
         default_satuan = "Pcs"
         default_rak = "Rak A"
 
       batch_baru = st.text_input("Lot / Batch No (Opsional)")
-      kategori = st.text_input(
-          "Kategori Barang", value=default_kategori
-      )
+      kategori = st.text_input("Kategori Barang", value=default_kategori)
 
       ada_tgl_prod_masuk = st.checkbox(
           "Ada Tanggal Produksi?", value=True, key="chk_prod_masuk"
@@ -436,7 +488,6 @@ with menu[3]:
         )
 
       keterangan = st.text_input("Keterangan / Supplier", "Datang Palet Baru")
-
       submit_masuk = st.form_submit_button("Simpan Barang Masuk")
 
       if submit_masuk:
@@ -451,40 +502,52 @@ with menu[3]:
               tgl_exp.strftime("%Y-%m-%d") if ada_tgl_exp_masuk else "-"
           )
 
-          new_row = pd.DataFrame([{
-              "ID Unik": id_baru,
-              "Kode Barang": kode_baru,
-              "Nama Barang": nama_baru,
-              "No Batch": batch_baru if batch_baru else "-",
-              "Kategori": kategori if kategori else "-",
-              "Warna Label": warna_pilih,
-              "Tgl Kedatangan": tgl_datang.strftime("%Y-%m-%d"),
-              "Tgl Produksi": final_tgl_prod,
-              "Tgl Expire": final_tgl_exp,
-              "Nama Rak": nama_rak if nama_rak else "-",
-              "Nomor Rak": nomor_rak if nomor_rak else "-",
-              "Tingkat Rak": tingkat_rak,
-              "Stok Sistem": stok_awal,
-              "Satuan": satuan_pilih,
-          }])
-          df_barang = pd.concat([df_barang, new_row], ignore_index=True)
-          df_barang.to_csv(DB_BARANG, index=False)
-
-          new_trx = pd.DataFrame([{
-              "Tanggal": get_waktu_wib(),
-              "ID Unik": id_baru,
-              "Kode Barang": kode_baru,
-              "Nama Barang": nama_baru,
-              "Tipe": "MASUK",
-              "Jumlah": stok_awal,
-              "Keterangan": keterangan,
-          }])
-          df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
-          df_transaksi.to_csv(DB_TRANSAKSI, index=False)
+          conn = get_connection()
+          cursor = conn.cursor()
+          cursor.execute(
+              """
+                INSERT INTO barang VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+              (
+                  id_baru,
+                  kode_baru,
+                  nama_baru,
+                  batch_baru if batch_baru else "-",
+                  kategori if kategori else "-",
+                  warna_pilih,
+                  tgl_datang.strftime("%Y-%m-%d"),
+                  final_tgl_prod,
+                  final_tgl_exp,
+                  nama_rak if nama_rak else "-",
+                  nomor_rak if nomor_rak else "-",
+                  tingkat_rak,
+                  stok_awal,
+                  satuan_pilih,
+              ),
+          )
+          cursor.execute(
+              """
+                INSERT INTO transaksi (tanggal, id_unik, kode_barang, nama_barang, tipe, jumlah, keterangan)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+              (
+                  get_waktu_wib(),
+                  id_baru,
+                  kode_barang,
+                  nama_baru,
+                  "MASUK",
+                  stok_awal,
+                  keterangan,
+              ),
+          )
+          conn.commit()
+          conn.close()
 
           st.success(
-              f"Barang Masuk `{nama_baru}` (Qty: {stok_awal} {satuan_pilih}) berhasil disimpan!"
+              f"Barang Masuk `{nama_baru}` (Qty: {stok_awal} {satuan_pilih})"
+              " berhasil disimpan secara permanen!"
           )
+          st.rerun()
 
 # ==========================================
 # 5. BARANG KELUAR
@@ -521,41 +584,52 @@ with menu[4]:
 
       if submit:
         id_pilih = pilih_keluar.split(" | ")[0]
-        idx = df_barang[df_barang["ID Unik"] == id_pilih].index[0]
-        stok_sekarang = int(df_barang.loc[idx, "Stok Sistem"])
-        nama_barang = df_barang.loc[idx, "Nama Barang"]
-        kode_barang = df_barang.loc[idx, "Kode Barang"]
+        row_keluar = df_barang[df_barang["ID Unik"] == id_pilih].iloc[0]
+        stok_sekarang = int(row_keluar["Stok Sistem"])
+        nama_barang = row_keluar["Nama Barang"]
+        kode_barang = row_keluar["Kode Barang"]
 
         if jumlah_keluar > stok_sekarang:
           st.error(
               f"Stok tidak mencukupi! Stok palet ini: {stok_sekarang} unit."
           )
         else:
-          df_barang.loc[idx, "Stok Sistem"] -= jumlah_keluar
-          df_barang.to_csv(DB_BARANG, index=False)
-
-          new_trx = pd.DataFrame([{
-              "Tanggal": get_waktu_wib(),
-              "ID Unik": id_pilih,
-              "Kode Barang": kode_barang,
-              "Nama Barang": nama_barang,
-              "Tipe": "KELUAR",
-              "Jumlah": jumlah_keluar,
-              "Keterangan": keterangan,
-          }])
-          df_transaksi = pd.concat([df_transaksi, new_trx], ignore_index=True)
-          df_transaksi.to_csv(DB_TRANSAKSI, index=False)
+          stok_baru = stok_sekarang - jumlah_keluar
+          conn = get_connection()
+          cursor = conn.cursor()
+          cursor.execute(
+              "UPDATE barang SET stok_sistem = ? WHERE id_unik = ?",
+              (stok_baru, id_pilih),
+          )
+          cursor.execute(
+              """
+                INSERT INTO transaksi (tanggal, id_unik, kode_barang, nama_barang, tipe, jumlah, keterangan)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+              (
+                  get_waktu_wib(),
+                  id_pilih,
+                  kode_barang,
+                  nama_barang,
+                  "KELUAR",
+                  jumlah_keluar,
+                  keterangan,
+              ),
+          )
+          conn.commit()
+          conn.close()
 
           st.success(
               f"Berhasil mengeluarkan {jumlah_keluar} unit {nama_barang}!"
           )
+          st.rerun()
 
 # ==========================================
 # 6. RIWAYAT TRANSAKSI
 # ==========================================
 with menu[5]:
   st.subheader("📜 Riwayat Barang Masuk & Keluar")
-  st.markdown("Catatan aktivitas keluar masuk material beserta tanggal & jamnya.")
+  st.markdown("Catatan aktivitas keluar masuk material tersimpan permanen.")
   st.markdown("---")
 
   if df_transaksi.empty:
@@ -732,30 +806,42 @@ with menu[6]:
       submit_simpan_edit = st.form_submit_button("💾 Simpan Perubahan Data")
 
       if submit_simpan_edit:
-        idx = df_barang[df_barang["ID Unik"] == id_lama].index[0]
-        df_barang.loc[idx, "Kode Barang"] = kode_baru_input
-        df_barang.loc[idx, "Nama Barang"] = nama_baru_input
-        df_barang.loc[idx, "No Batch"] = (
-            batch_baru_input if batch_baru_input else "-"
-        )
-        df_barang.loc[idx, "Kategori"] = kategori_baru_input
-        df_barang.loc[idx, "Tgl Kedatangan"] = tgl_datang_baru.strftime(
-            "%Y-%m-%d"
-        )
-        df_barang.loc[idx, "Tgl Produksi"] = (
+        final_tgl_prod_ed = (
             tgl_prod_baru.strftime("%Y-%m-%d") if ada_tgl_prod else "-"
         )
-        df_barang.loc[idx, "Tgl Expire"] = (
+        final_tgl_exp_ed = (
             tgl_exp_baru.strftime("%Y-%m-%d") if ada_tgl_exp else "-"
         )
-        df_barang.loc[idx, "Warna Label"] = warna_baru
-        df_barang.loc[idx, "Nama Rak"] = nama_rak_baru
-        df_barang.loc[idx, "Nomor Rak"] = nomor_rak_baru
-        df_barang.loc[idx, "Tingkat Rak"] = tingkat_baru
-        df_barang.loc[idx, "Stok Sistem"] = stok_baru
-        df_barang.loc[idx, "Satuan"] = satuan_baru
 
-        df_barang.to_csv(DB_BARANG, index=False)
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE barang SET kode_barang = ?, nama_barang = ?, no_batch = ?, kategori = ?, 
+            warna_label = ?, tgl_kedatangan = ?, tgl_produksi = ?, tgl_expire = ?, 
+            nama_rak = ?, nomor_rak = ?, tingkat_rak = ?, stok_sistem = ?, satuan = ?
+            WHERE id_unik = ?
+        """,
+            (
+                kode_baru_input,
+                nama_baru_input,
+                batch_baru_input if batch_baru_input else "-",
+                kategori_baru_input,
+                warna_baru,
+                tgl_datang_baru.strftime("%Y-%m-%d"),
+                final_tgl_prod_ed,
+                final_tgl_exp_ed,
+                nama_rak_baru,
+                nomor_rak_baru,
+                tingkat_baru,
+                stok_baru,
+                satuan_baru,
+                id_lama,
+            ),
+        )
+        conn.commit()
+        conn.close()
+
         st.success(f"Data material `{nama_baru_input}` berhasil diperbarui!")
         st.rerun()
 
@@ -788,9 +874,13 @@ with menu[7]:
       if submit_hapus:
         if konfirmasi:
           id_hapus = pilih_hapus.split(" | ")[0]
-          df_barang = df_barang[df_barang["ID Unik"] != id_hapus]
-          df_barang.to_csv(DB_BARANG, index=False)
-          st.success("Barang berhasil dihapus dari sistem!")
+          conn = get_connection()
+          cursor = conn.cursor()
+          cursor.execute("DELETE FROM barang WHERE id_unik = ?", (id_hapus,))
+          conn.commit()
+          conn.close()
+
+          st.success("Barang berhasil dihapus secara permanen!")
           st.rerun()
         else:
           st.error("Silakan centang kotak konfirmasi terlebih dahulu!")
@@ -864,12 +954,19 @@ with menu[8]:
       st.dataframe(df_opname_styled, use_container_width=True)
 
       if st.button("💾 Sinkronkan Stok Sistem dengan Fisik Aktual"):
+        conn = get_connection()
+        cursor = conn.cursor()
         for _, row in df_opname.iterrows():
-          df_barang.loc[
-              df_barang["ID Unik"] == row["ID Unik"], "Stok Sistem"
-          ] = row["Stok Fisik"]
-        df_barang.to_csv(DB_BARANG, index=False)
-        st.success("Stok sistem berhasil disesuaikan dengan hasil opname fisik!")
+          cursor.execute(
+              "UPDATE barang SET stok_sistem = ? WHERE id_unik = ?",
+              (row["Stok Fisik"], row["ID Unik"]),
+          )
+        conn.commit()
+        conn.close()
+        st.success(
+            "Stok sistem berhasil disesuaikan dengan hasil opname fisik secara"
+            " permanen!"
+        )
         st.rerun()
 
 # ==========================================
@@ -955,24 +1052,34 @@ with menu[9]:
         final_tgl_exp = (
             tgl_exp.strftime("%Y-%m-%d") if ada_tgl_exp_tambah else "-"
         )
-        new_row = pd.DataFrame([{
-            "ID Unik": id_baru,
-            "Kode Barang": kode_baru,
-            "Nama Barang": nama_baru,
-            "No Batch": batch_baru if batch_baru else "-",
-            "Kategori": kategori if kategori else "-",
-            "Warna Label": warna_pilih,
-            "Tgl Kedatangan": tgl_datang.strftime("%Y-%m-%d"),
-            "Tgl Produksi": final_tgl_prod,
-            "Tgl Expire": final_tgl_exp,
-            "Nama Rak": nama_rak if nama_rak else "-",
-            "Nomor Rak": nomor_rak if nomor_rak else "-",
-            "Tingkat Rak": tingkat_rak,
-            "Stok Sistem": stok_awal,
-            "Satuan": satuan_pilih,
-        }])
-        df_barang = pd.concat([df_barang, new_row], ignore_index=True)
-        df_barang.to_csv(DB_BARANG, index=False)
-        st.success(
-            f"Master Material `{nama_baru}` berhasil disimpan di `{nama_rak}`!"
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO barang VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                id_baru,
+                kode_baru,
+                nama_baru,
+                batch_baru if batch_baru else "-",
+                kategori if kategori else "-",
+                warna_pilih,
+                tgl_datang.strftime("%Y-%m-%d"),
+                final_tgl_prod,
+                final_tgl_exp,
+                nama_rak if nama_rak else "-",
+                nomor_rak if nomor_rak else "-",
+                tingkat_rak,
+                stok_awal,
+                satuan_pilih,
+            ),
         )
+        conn.commit()
+        conn.close()
+
+        st.success(
+            f"Master Material `{nama_baru}` berhasil disimpan secara permanen!"
+        )
+        st.rerun()
