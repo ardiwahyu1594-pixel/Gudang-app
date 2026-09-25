@@ -18,6 +18,7 @@ def init_db():
   if not os.path.exists(DB_BARANG):
     df_barang = pd.DataFrame(
         columns=[
+            "ID Unik",
             "Kode Barang",
             "Nama Barang",
             "No Batch",
@@ -39,6 +40,7 @@ def init_db():
     df_transaksi = pd.DataFrame(
         columns=[
             "Tanggal",
+            "ID Unik",
             "Kode Barang",
             "Nama Barang",
             "Tipe",
@@ -55,6 +57,15 @@ init_db()
 df_barang = pd.read_csv(DB_BARANG)
 
 # Perbaikan otomatis jika kolom versi lama belum ada
+if "ID Unik" not in df_barang.columns:
+  df_barang.insert(
+      0,
+      "ID Unik",
+      [
+          f"ID-{i+1}-{datetime.now().strftime('%H%M%S')}"
+          for i in range(len(df_barang))
+      ],
+  )
 if "No Batch" not in df_barang.columns:
   df_barang["No Batch"] = "-"
 if "Satuan" not in df_barang.columns:
@@ -171,18 +182,27 @@ with menu[0]:
 
       st.markdown("---")
       with st.expander("🔎 Klik di sini untuk Melihat Detail Lengkap Material"):
-        pilih_detail = st.selectbox(
-            "Pilih Material / Palet",
-            df_sumber["Kode Barang"] + " - " + df_sumber["Nama Barang"],
+         opsi_detail = (
+            df_sumber["ID Unik"]
+            + " | "
+            + df_sumber["Kode Barang"]
+            + " - "
+            + df_sumber["Nama Barang"]
+            + " (Datang: "
+            + df_sumber["Tgl Kedatangan"]
+            + ")"
+        )
+         pilih_detail = st.selectbox(
+            "Pilih Material / Palet", opsi_detail
         )
 
-        if pilih_detail:
-          kode_pilih = pilih_detail.split(" - ")[0]
-          row_detail = df_sumber[df_sumber["Kode Barang"] == kode_pilih].iloc[0]
+         if pilih_detail:
+          id_pilih = pilih_detail.split(" | ")[0]
+          row_detail = df_sumber[df_sumber["ID Unik"] == id_pilih].iloc[0]
 
           st.info(
               f"📦 **Nama Material:** {row_detail['Nama Barang']}\n\n"
-              f"🏷️ **Kode / Lot Palet:** `{row_detail['Kode Barang']}`\n\n"
+              f"🏷️ **Kode Barang:** `{row_detail['Kode Barang']}`\n\n"
               f"🔖 **No Batch / Lot No:** `{row_detail['No Batch']}`\n\n"
               f"🏷️ **Kategori:** {row_detail['Kategori']} | 🎨 **Label:**"
               f" {row_detail['Warna Label']}\n\n"
@@ -202,7 +222,6 @@ with menu[0]:
     st.markdown("### 📈 Grafik Statistik Stok per Rak")
     if "Nama Rak" in df_barang.columns and not df_barang.empty:
       df_grafik = df_barang.groupby("Nama Rak")["Stok Sistem"].sum()
-      # Menggunakan use_container_width dan membersihkan tampilan grafik
       st.bar_chart(df_grafik, use_container_width=True)
 
 # ==========================================
@@ -238,7 +257,7 @@ with menu[1]:
       for _, row in df_hasil_rak.iterrows():
         st.info(
             f"📦 **{row['Nama Barang']}**\n\n"
-            f"🏷️ **Kode/Lot:** `{row['Kode Barang']}` | 🔖 **Batch:**"
+            f"🏷️ **Kode:** `{row['Kode Barang']}` | 🔖 **Batch:**"
             f" `{row['No Batch']}`\n\n"
             f"📌 **Lokasi:** {row['Nama Rak']} - No. {row['Nomor Rak']} ("
             f"{row['Tingkat Rak']})\n\n"
@@ -288,7 +307,7 @@ with menu[2]:
               with cols[i % len(cols)]:
                 st.info(
                     f"**{row['Nama Barang']}**\n\n"
-                    f"🏷️ **Kode/Lot:** `{row['Kode Barang']}`\n\n"
+                    f"🏷️ **Kode:** `{row['Kode Barang']}`\n\n"
                     f"🔖 **Batch:** {row['No Batch']}\n\n"
                     f"📌 **Blok/Kolom:** {row['Nomor Rak']}\n\n"
                     f"📦 **Stok:** {row['Stok Sistem']} {row['Satuan']}**\n\n"
@@ -298,30 +317,23 @@ with menu[2]:
             st.markdown("---")
 
 # ==========================================
-# 4. BARANG MASUK (DENGAN NAMA BARANG OTOMATIS)
+# 4. BARANG MASUK (KODE OTOMATIS TERSEMBUNYI)
 # ==========================================
 with menu[3]:
   st.subheader("📥 Input Barang Masuk (Palet / Kedatangan Baru)")
-  st.markdown(
-      "Pilih nama material yang sudah ada agar terisi otomatis, atau ketik"
-      " baru."
-  )
+  st.markdown("Pilih langsung nama materialnya, sistem akan menyesuaikan kodenya secara otomatis.")
   st.markdown("---")
 
   if df_barang.empty:
     st.warning("Belum ada master barang. Silakan tambah di menu ➕.")
   else:
-    # Ambil daftar nama barang unik yang sudah ada
     daftar_nama_master = sorted(
         df_barang["Nama Barang"].dropna().unique().tolist()
     )
 
     with st.form("form_barang_masuk_lengkap"):
-      kode_baru = st.text_input(
-          "Kode / No Lot Palet Baru (Contoh: PM-00003-4)"
-      )
-
-      # Pilihan Mode: Pilih dari master yang ada atau ketik baru
+      
+      # Pindah ke paling atas agar langsung dipilih
       tipe_input_nama = st.radio(
           "Pilih Sumber Nama Material",
           ["Pilih dari Barang yang Sudah Ada", "Ketik Nama Material Baru"],
@@ -333,15 +345,19 @@ with menu[3]:
             "Pilih Nama Material", daftar_nama_master
         )
         nama_baru = nama_terpilih
-        # Ambil otomatis kategori dan satuan dari barang sebelumnya jika ada
-        contoh_row = df_barang[df_barang["Nama Barang"] == nama_terpilih].iloc[
-            0
-        ]
+        contoh_row = df_barang[df_barang["Nama Barang"] == nama_terpilih].iloc[0]
+        
+        # Ambil Kode Barang dari database tanpa perlu menampilkannya di form input
+        kode_baru = str(contoh_row["Kode Barang"])
+        
         default_kategori = str(contoh_row["Kategori"])
         default_satuan = str(contoh_row["Satuan"])
         default_rak = str(contoh_row["Nama Rak"])
       else:
-        nama_baru = st.text_input("Nama Material Baru")
+        # Jika barang benar-benar baru, barulah munculkan kolom Kode Barang dan Nama Material
+        nama_baru = st.text_input("Nama Material Baru (Ketik manual)")
+        kode_baru = st.text_input("Kode Barang Baru (Wajib Diisi)")
+        
         default_kategori = "Packaging"
         default_satuan = "Pcs"
         default_rak = "Rak A"
@@ -425,10 +441,9 @@ with menu[3]:
 
       if submit_masuk:
         if not kode_baru or not nama_baru:
-          st.error("Kode dan Nama Material wajib diisi!")
-        elif kode_baru in df_barang["Kode Barang"].values:
-          st.error("Kode/Lot palet tersebut sudah terdaftar di sistem!")
+          st.error("Nama Material (dan Kode jika baru) wajib diisi!")
         else:
+          id_baru = f"ID-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
           final_tgl_prod = (
               tgl_prod.strftime("%Y-%m-%d") if ada_tgl_prod_masuk else "-"
           )
@@ -437,6 +452,7 @@ with menu[3]:
           )
 
           new_row = pd.DataFrame([{
+              "ID Unik": id_baru,
               "Kode Barang": kode_baru,
               "Nama Barang": nama_baru,
               "No Batch": batch_baru if batch_baru else "-",
@@ -456,6 +472,7 @@ with menu[3]:
 
           new_trx = pd.DataFrame([{
               "Tanggal": get_waktu_wib(),
+              "ID Unik": id_baru,
               "Kode Barang": kode_baru,
               "Nama Barang": nama_baru,
               "Tipe": "MASUK",
@@ -466,8 +483,7 @@ with menu[3]:
           df_transaksi.to_csv(DB_TRANSAKSI, index=False)
 
           st.success(
-              f"Barang Masuk `{nama_baru}` (Palet: {kode_baru} | Qty:"
-              f" {stok_awal} {satuan_pilih}) berhasil disimpan!"
+              f"Barang Masuk `{nama_baru}` (Qty: {stok_awal} {satuan_pilih}) berhasil disimpan!"
           )
 
 # ==========================================
@@ -481,16 +497,22 @@ with menu[4]:
     st.warning("Belum ada data barang!")
   else:
     with st.form("form_barang_keluar"):
-      kode_pilih = st.selectbox(
-          "Pilih Barang / Palet",
-          df_barang["Kode Barang"]
+      opsi_keluar = (
+          df_barang["ID Unik"]
+          + " | "
+          + df_barang["Kode Barang"]
           + " - "
           + df_barang["Nama Barang"]
           + " (Datang: "
           + df_barang["Tgl Kedatangan"]
-          + ")",
-          key="pilih_keluar",
+          + " | Stok: "
+          + df_barang["Stok Sistem"].astype(str)
+          + " "
+          + df_barang["Satuan"]
+          + ")"
       )
+      pilih_keluar = st.selectbox("Pilih Barang / Palet", opsi_keluar)
+
       jumlah_keluar = st.number_input(
           "Jumlah Keluar", min_value=1, step=1, value=1
       )
@@ -498,10 +520,11 @@ with menu[4]:
       submit = st.form_submit_button("Simpan Barang Keluar")
 
       if submit:
-        kode_barang = kode_pilih.split(" - ")[0]
-        idx = df_barang[df_barang["Kode Barang"] == kode_barang].index[0]
+        id_pilih = pilih_keluar.split(" | ")[0]
+        idx = df_barang[df_barang["ID Unik"] == id_pilih].index[0]
         stok_sekarang = int(df_barang.loc[idx, "Stok Sistem"])
         nama_barang = df_barang.loc[idx, "Nama Barang"]
+        kode_barang = df_barang.loc[idx, "Kode Barang"]
 
         if jumlah_keluar > stok_sekarang:
           st.error(
@@ -513,6 +536,7 @@ with menu[4]:
 
           new_trx = pd.DataFrame([{
               "Tanggal": get_waktu_wib(),
+              "ID Unik": id_pilih,
               "Kode Barang": kode_barang,
               "Nama Barang": nama_barang,
               "Tipe": "KELUAR",
@@ -546,7 +570,12 @@ with menu[5]:
       df_trx_tampil = df_transaksi
 
     df_trx_tampil = df_trx_tampil.iloc[::-1]
-    st.dataframe(df_trx_tampil, use_container_width=True)
+    kolom_tampil_trx = [
+        col for col in df_trx_tampil.columns if col != "ID Unik"
+    ]
+    st.dataframe(
+        df_trx_tampil[kolom_tampil_trx], use_container_width=True
+    )
 
 # ==========================================
 # 7. EDIT DATA BARANG
@@ -559,18 +588,26 @@ with menu[6]:
   if df_barang.empty:
     st.warning("Belum ada data barang untuk diedit!")
   else:
+    opsi_edit = (
+        df_barang["ID Unik"]
+        + " | "
+        + df_barang["Kode Barang"]
+        + " - "
+        + df_barang["Nama Barang"]
+        + " (Datang: "
+        + df_barang["Tgl Kedatangan"]
+        + ")"
+    )
     pilih_brg = st.selectbox(
-        "Pilih Barang / Palet yang Ingin Diedit",
-        df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
-        key="pilih_edit_barang",
+        "Pilih Barang / Palet yang Ingin Diedit", opsi_edit
     )
 
-    kode_lama = pilih_brg.split(" - ")[0]
-    data_lama = df_barang.loc[df_barang["Kode Barang"] == kode_lama].iloc[0]
+    id_lama = pilih_brg.split(" | ")[0]
+    data_lama = df_barang.loc[df_barang["ID Unik"] == id_lama].iloc[0]
 
     with st.form("form_edit_semua"):
       kode_baru_input = st.text_input(
-          "Kode Barang / Lot Palet", value=str(data_lama["Kode Barang"])
+          "Kode Barang / Lot", value=str(data_lama["Kode Barang"])
       )
       nama_baru_input = st.text_input(
           "Nama Material", value=str(data_lama["Nama Barang"])
@@ -695,7 +732,7 @@ with menu[6]:
       submit_simpan_edit = st.form_submit_button("💾 Simpan Perubahan Data")
 
       if submit_simpan_edit:
-        idx = df_barang[df_barang["Kode Barang"] == kode_lama].index[0]
+        idx = df_barang[df_barang["ID Unik"] == id_lama].index[0]
         df_barang.loc[idx, "Kode Barang"] = kode_baru_input
         df_barang.loc[idx, "Nama Barang"] = nama_baru_input
         df_barang.loc[idx, "No Batch"] = (
@@ -734,20 +771,26 @@ with menu[7]:
     st.info("Tidak ada data barang untuk dihapus.")
   else:
     with st.form("form_hapus_barang"):
-      pilih_hapus = st.selectbox(
-          "Pilih Barang yang Akan Dihapus",
-          df_barang["Kode Barang"] + " - " + df_barang["Nama Barang"],
-          key="pilih_hapus_barang",
+      opsi_hapus = (
+          df_barang["ID Unik"]
+          + " | "
+          + df_barang["Kode Barang"]
+          + " - "
+          + df_barang["Nama Barang"]
+          + " (Datang: "
+          + df_barang["Tgl Kedatangan"]
+          + ")"
       )
+      pilih_hapus = st.selectbox("Pilih Barang yang Akan Dihapus", opsi_hapus)
       konfirmasi = st.checkbox("Saya yakin ingin menghapus barang ini")
       submit_hapus = st.form_submit_button("🗑️ Hapus Barang")
 
       if submit_hapus:
         if konfirmasi:
-          kode_hapus = pilih_hapus.split(" - ")[0]
-          df_barang = df_barang[df_barang["Kode Barang"] != kode_hapus]
+          id_hapus = pilih_hapus.split(" | ")[0]
+          df_barang = df_barang[df_barang["ID Unik"] != id_hapus]
           df_barang.to_csv(DB_BARANG, index=False)
-          st.success(f"Barang `{kode_hapus}` berhasil dihapus dari sistem!")
+          st.success("Barang berhasil dihapus dari sistem!")
           st.rerun()
         else:
           st.error("Silakan centang kotak konfirmasi terlebih dahulu!")
@@ -780,13 +823,14 @@ with menu[8]:
         st.write(f"Stok Sistem: **{row['Stok Sistem']} {row['Satuan']}**")
       with col3:
         fisik = st.number_input(
-            f"Fisik {row['Kode Barang']}",
+            f"Fisik {row['ID Unik']}",
             min_value=0,
             value=int(row["Stok Sistem"]),
-            key=f"opname_{row['Kode Barang']}",
+            key=f"opname_{row['ID Unik']}",
             label_visibility="collapsed",
         )
       opname_data.append({
+          "ID Unik": row["ID Unik"],
           "Kode Barang": row["Kode Barang"],
           "Nama Barang": row["Nama Barang"],
           "No Batch": row["No Batch"],
@@ -811,13 +855,18 @@ with menu[8]:
 
       st.markdown("---")
       st.subheader("Hasil Laporan Stok Opname")
-      df_opname_styled = df_opname.style.apply(warnai_manual, axis=1)
+      kolom_tampil_opname = [
+          col for col in df_opname.columns if col != "ID Unik"
+      ]
+      df_opname_styled = df_opname[kolom_tampil_opname].style.apply(
+          warnai_manual, axis=1
+      )
       st.dataframe(df_opname_styled, use_container_width=True)
 
       if st.button("💾 Sinkronkan Stok Sistem dengan Fisik Aktual"):
         for _, row in df_opname.iterrows():
           df_barang.loc[
-              df_barang["Kode Barang"] == row["Kode Barang"], "Stok Sistem"
+              df_barang["ID Unik"] == row["ID Unik"], "Stok Sistem"
           ] = row["Stok Fisik"]
         df_barang.to_csv(DB_BARANG, index=False)
         st.success("Stok sistem berhasil disesuaikan dengan hasil opname fisik!")
@@ -831,7 +880,7 @@ with menu[9]:
   st.markdown("---")
 
   with st.form("form_tambah_barang_baru"):
-    kode_baru = st.text_input("Kode Barang / Lot (Contoh: PM-00003)")
+    kode_baru = st.text_input("Kode Barang (Boleh sama dengan material lain)")
     nama_baru = st.text_input(
         "Material Name (Contoh: Carton klatu Premium @65 mL)"
     )
@@ -898,9 +947,8 @@ with menu[9]:
     if submit_barang:
       if not kode_baru or not nama_baru:
         st.error("Kode dan Nama Material wajib diisi!")
-      elif kode_baru in df_barang["Kode Barang"].values:
-        st.error("Kode barang sudah terdaftar!")
       else:
+        id_baru = f"ID-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
         final_tgl_prod = (
             tgl_prod.strftime("%Y-%m-%d") if ada_tgl_prod_tambah else "-"
         )
@@ -908,6 +956,7 @@ with menu[9]:
             tgl_exp.strftime("%Y-%m-%d") if ada_tgl_exp_tambah else "-"
         )
         new_row = pd.DataFrame([{
+            "ID Unik": id_baru,
             "Kode Barang": kode_baru,
             "Nama Barang": nama_baru,
             "No Batch": batch_baru if batch_baru else "-",
